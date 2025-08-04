@@ -1463,7 +1463,7 @@ const PayrollDashboard = () => {
         return;
       }
 
-      // dashboard-logos 버킷 확인 및 생성
+      // company-logos 버킷 확인 및 생성
       const bucketReady = await ensureLogoStorageBucket();
       if (!bucketReady) {
         setIsUploading(false);
@@ -1474,20 +1474,20 @@ const PayrollDashboard = () => {
       // 안전한 파일명 생성
       const timestamp = new Date().getTime();
       const fileExtension = file.name.split('.').pop();
-      const safeFileName = `dashboard_logo_${timestamp}.${fileExtension}`;
+      const safeFileName = `company_logo_${timestamp}.${fileExtension}`;
 
-      // dashboard-logos 버킷에 업로드
-      console.log('dashboard-logos 버킷으로 업로드 시도...');
+      // company-logos 버킷에 업로드
+      console.log('company-logos 버킷으로 업로드 시도...');
       
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('dashboard-logos')
+        .from('company-logos')
         .upload(safeFileName, file, {
           cacheControl: '3600',
           upsert: false
         });
 
       if (uploadError) {
-        console.error('dashboard-logos 버킷 업로드 실패:', uploadError);
+        console.error('company-logos 버킷 업로드 실패:', uploadError);
         alert(`로고 업로드에 실패했습니다: ${uploadError.message}`);
         setIsUploading(false);
         setUploadProgress(0);
@@ -1496,7 +1496,7 @@ const PayrollDashboard = () => {
 
       // 공개 URL 생성
       const { data: urlData } = supabase.storage
-        .from('dashboard-logos')
+        .from('company-logos')
         .getPublicUrl(safeFileName);
 
       if (!urlData?.publicUrl) {
@@ -1506,7 +1506,7 @@ const PayrollDashboard = () => {
         return;
       }
 
-      console.log('dashboard-logos 버킷 업로드 성공!');
+      console.log('company-logos 버킷 업로드 성공!');
       const finalUrl = urlData.publicUrl;
 
       // 성공 시 설정 업데이트
@@ -2013,28 +2013,28 @@ const PayrollDashboard = () => {
         return false;
       }
       
-      const dashboardLogosBucket = buckets.find(bucket => bucket.name === 'dashboard-logos');
+      const companyLogosBucket = buckets.find(bucket => bucket.name === 'company-logos');
       
-      if (!dashboardLogosBucket) {
+      if (!companyLogosBucket) {
         try {
           // 버킷 자동 생성 시도
-          const { data, error: createError } = await supabase.storage.createBucket('dashboard-logos', {
+          const { data, error: createError } = await supabase.storage.createBucket('company-logos', {
             public: true,
             fileSizeLimit: 5242880, // 5MB
             allowedMimeTypes: ['image/*']
           });
           
           if (createError) {
-            console.error('Error creating dashboard-logos bucket:', createError);
-            alert(`dashboard-logos 버킷 생성에 실패했습니다.\n\nSupabase 대시보드에서 Storage → New bucket → Name: dashboard-logos, Public bucket 체크 후 생성해주세요.\n\n오류: ${createError.message}`);
+            console.error('Error creating company-logos bucket:', createError);
+            alert(`company-logos 버킷 생성에 실패했습니다.\n\nSupabase 대시보드에서 Storage → New bucket → Name: company-logos, Public bucket 체크 후 생성해주세요.\n\n오류: ${createError.message}`);
             return false;
           }
           
-          console.log('dashboard-logos bucket created successfully');
+          console.log('company-logos bucket created successfully');
           return true;
         } catch (error) {
           console.error('Error creating bucket:', error);
-          alert(`dashboard-logos 버킷이 존재하지 않습니다.\n현재 사용 가능한 버킷:\n${buckets.map(b => b.name).join(', ') || '없음'}\n\nSupabase 대시보드에서 Storage → New bucket → Name: dashboard-logos, Public bucket 체크 후 생성해주세요.`);
+          alert(`company-logos 버킷이 존재하지 않습니다.\n현재 사용 가능한 버킷:\n${buckets.map(b => b.name).join(', ') || '없음'}\n\nSupabase 대시보드에서 Storage → New bucket → Name: company-logos, Public bucket 체크 후 생성해주세요.`);
           return false;
         }
       }
