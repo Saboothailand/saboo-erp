@@ -1324,19 +1324,19 @@ const PayrollDashboard = () => {
       console.log('사용 가능한 버킷 목록:', buckets?.map(b => b.name));
       console.log('버킷 상세 정보:', buckets);
       
-      const logosBucketExists = buckets?.some(bucket => bucket.name === 'dashboard-logos');
-      console.log('dashboard-logos 버킷 존재 여부:', logosBucketExists);
+      const logosBucketExists = buckets?.some(bucket => bucket.name === 'company-logos');
+      console.log('company-logos 버킷 존재 여부:', logosBucketExists);
       
       if (!logosBucketExists) {
         const availableBuckets = buckets?.map(b => b.name).join(', ') || '없음';
-        alert(`dashboard-logos 버킷이 존재하지 않습니다.\n\n현재 사용 가능한 버킷:\n${availableBuckets}\n\nSupabase 대시보드에서 Storage → New bucket → Name: dashboard-logos, Public bucket 체크 후 생성해주세요.`);
+        alert(`company-logos 버킷이 존재하지 않습니다.\n\n현재 사용 가능한 버킷:\n${availableBuckets}\n\nSupabase 대시보드에서 Storage → New bucket → Name: company-logos, Public bucket 체크 후 생성해주세요.`);
         return;
       }
 
       // Supabase Storage에 업로드
       const fileName = `logo_${Date.now()}_${file.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('dashboard-logos')
+        .from('company-logos')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -1350,7 +1350,7 @@ const PayrollDashboard = () => {
 
       // 공개 URL 가져오기
       const { data: urlData } = supabase.storage
-        .from('dashboard-logos')
+        .from('company-logos')
         .getPublicUrl(fileName);
 
       if (!urlData?.publicUrl) {
