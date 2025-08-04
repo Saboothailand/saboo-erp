@@ -422,6 +422,9 @@ const PayrollDashboard = () => {
           console.error('대시보드 설정 초기화 오류:', insertError);
         }
       } else if (dashboardSettingsData) {
+        console.log('대시보드 설정 데이터:', dashboardSettingsData);
+        console.log('로고 URL:', dashboardSettingsData.logo_url);
+        
         setDashboardSettings({
           showWelcomeMessage: dashboardSettingsData.show_welcome_message || true,
           welcomeMessage: dashboardSettingsData.welcome_message || '안녕하세요! 급여 관리 시스템에 오신 것을 환영합니다.',
@@ -2521,6 +2524,13 @@ const PayrollDashboard = () => {
                 src={dashboardSettings.logoUrl} 
                 alt="Dashboard Logo" 
                 className={`w-8 h-8 rounded object-cover ${!sidebarOpen && 'hidden'}`}
+                onError={(e) => {
+                  console.error('로고 이미지 로드 실패:', dashboardSettings.logoUrl);
+                  e.currentTarget.style.display = 'none';
+                }}
+                onLoad={() => {
+                  console.log('로고 이미지 로드 성공:', dashboardSettings.logoUrl);
+                }}
               />
             ) : (
               <Building className="text-pink-600" size={24} />
