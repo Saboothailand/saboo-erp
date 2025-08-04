@@ -1,0 +1,2929 @@
+'use client'
+
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, 
+  DollarSign, 
+  Clock, 
+  TrendingUp, 
+  Search, 
+  Filter, 
+  Plus,
+  Eye,
+  Edit,
+  Check,
+  X,
+  Calendar,
+  Building,
+  User,
+  LogOut,
+  Menu,
+  Home,
+  FileText,
+  Settings,
+  UserPlus,
+  UserMinus
+} from 'lucide-react';
+import { supabase, Employee, PayrollStatement, OvertimeRecord } from '@/lib/supabase';
+
+const PayrollDashboard = () => {
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState('JULY');
+  const [selectedYear, setSelectedYear] = useState(2025);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // 상태 관리
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [payrollData, setPayrollData] = useState<PayrollStatement[]>([]);
+  const [overtimeData, setOvertimeData] = useState<OvertimeRecord[]>([]);
+  const [companySettings, setCompanySettings] = useState<any>(null);
+
+  // 모달 상태 관리
+  const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [showOvertimeModal, setShowOvertimeModal] = useState(false);
+  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+  const [editingPayroll, setEditingPayroll] = useState<PayrollStatement | null>(null);
+  const [editingOvertime, setEditingOvertime] = useState<OvertimeRecord | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
+  // 새 데이터 상태
+  const [newPayroll, setNewPayroll] = useState({
+    employee_id: 0,
+    base_salary: 0,
+    performance_bonus: 0,
+    special_bonus: 0,
+    position_allowance: 0,
+    meal_allowance: 0,
+    transport_allowance: 0,
+    social_insurance: 0,
+    personal_tax: 0,
+    advance_salary: 0,
+    salary_deduction: 0,
+    other_deductions: 0
+  });
+
+  const [newOvertime, setNewOvertime] = useState({
+    employee_id: 0,
+    overtime_date: '',
+    start_time: '',
+    end_time: '',
+    work_description: '',
+    reason: 'OTHER',
+    priority: 'MEDIUM'
+  });
+
+  const [newEmployee, setNewEmployee] = useState({
+    employee_code: '',
+    nick_name: '',
+    full_name: '',
+    full_name_thai: '',
+    department: 'IT',
+    start_date: '',
+    bank_name: '',
+    bank_account: '',
+    monthly_salary: '',
+    social_insurance_rate: '5',
+    tax_rate: '10',
+    performance_rating: 3,
+    status: 'ACTIVE'
+  });
+
+  // 데이터 로드
+  useEffect(() => {
+    loadData();
+  }, [selectedYear, selectedMonth]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Supabase 연결 확인
+      if (!supabase) {
+        throw new Error('Supabase 클라이언트가 초기화되지 않았습니다.');
+      }
+
+      // 직원 데이터 로드
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('status', 'ACTIVE');
+
+      if (employeesError) {
+        console.error('직원 데이터 로드 오류:', employeesError);
+        throw new Error(`직원 데이터를 불러올 수 없습니다: ${employeesError.message}`);
+      }
+      setEmployees(employeesData || []);
+
+      // 급여 데이터 로드
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payroll_statements')
+        .select(`
+          *,
+          employees (
+            employee_code,
+            nick_name,
+            full_name,
+            department
+          )
+        `)
+        .eq('pay_year', selectedYear)
+        .eq('pay_month', selectedMonth);
+
+      if (payrollError) {
+        console.error('급여 데이터 로드 오류:', payrollError);
+        throw new Error(`급여 데이터를 불러올 수 없습니다: ${payrollError.message}`);
+      }
+      setPayrollData(payrollData || []);
+
+      // 오버타임 데이터 로드
+      const { data: overtimeData, error: overtimeError } = await supabase
+        .from('overtime_records')
+        .select(`
+          *,
+          employees (
+            employee_code,
+            nick_name
+          )
+        `)
+        .eq('overtime_date', `${selectedYear}-${getMonthNumber(selectedMonth)}-01`);
+
+      if (overtimeError) {
+        console.error('오버타임 데이터 로드 오류:', overtimeError);
+        throw new Error(`오버타임 데이터를 불러올 수 없습니다: ${overtimeError.message}`);
+      }
+      setOvertimeData(overtimeData || []);
+
+      // 회사 설정 로드
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+
+      if (settingsError) {
+        console.error('회사 설정 로드 오류:', settingsError);
+        // 오류가 있어도 기본값 사용
+        setCompanySettings({
+          company_name: '급여관리 시스템',
+          logo_url: null,
+          logo_filename: null
+        });
+      } else {
+        setCompanySettings(settingsData);
+      }
+
+    } catch (error) {
+      console.error('데이터 로드 오류:', error);
+      // 사용자에게 오류 메시지 표시 (추후 알림 컴포넌트 추가 예정)
+      alert(`데이터를 불러오는 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMonthNumber = (month: string) => {
+    const months: { [key: string]: string } = {
+      'JANUARY': '01', 'FEBRUARY': '02', 'MARCH': '03', 'APRIL': '04',
+      'MAY': '05', 'JUNE': '06', 'JULY': '07', 'AUGUST': '08',
+      'SEPTEMBER': '09', 'OCTOBER': '10', 'NOVEMBER': '11', 'DECEMBER': '12'
+    };
+    return months[month] || '01';
+  };
+
+  // 통계 계산
+  const totalEmployees = employees.length;
+  const totalGrossSalary = payrollData.reduce((sum, emp) => {
+    const gross = emp.base_salary + 
+                  (emp.total_overtime_hours * emp.overtime_rate) + 
+                  emp.performance_bonus + 
+                  emp.special_bonus + 
+                  emp.position_allowance + 
+                  emp.meal_allowance + 
+                  emp.transport_allowance;
+    return sum + gross;
+  }, 0);
+  const totalOvertimeHours = payrollData.reduce((sum, emp) => sum + emp.total_overtime_hours, 0);
+  const pendingApprovals = payrollData.filter(emp => emp.status === 'DRAFT').length;
+
+  // 필터링된 데이터
+  const filteredPayrollData = payrollData.filter(emp => {
+    const employee = emp.employees as any;
+    return employee?.nick_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           employee?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           employee?.employee_code?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  // 급여명세서가 없는 직원들 찾기
+  const employeesWithoutPayroll = employees.filter(emp => 
+    !payrollData.some(p => p.employee_id === emp.id)
+  );
+
+  // 오버타임 승인/거부 함수
+  const handleOvertimeAction = async (overtimeId: number, action: 'APPROVE' | 'REJECT', reason?: string) => {
+    try {
+      const { error } = await supabase.rpc('approve_overtime_record', {
+        p_overtime_id: overtimeId,
+        p_admin_id: 1, // 실제로는 로그인된 관리자 ID
+        p_status: action,
+        p_rejection_reason: reason
+      });
+
+      if (error) throw error;
+      loadData(); // 데이터 새로고침
+    } catch (error) {
+      console.error('오버타임 처리 오류:', error);
+    }
+  };
+
+  // 급여관리 핸들러 함수들
+  const handleAddPayroll = async () => {
+    try {
+      if (!newPayroll.employee_id || !newPayroll.base_salary || Number(newPayroll.base_salary) <= 0) {
+        alert('직원을 선택하고 기본급을 입력해주세요.');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('payroll_statements')
+        .insert([
+          {
+            employee_id: newPayroll.employee_id,
+            pay_year: selectedYear,
+            pay_month: selectedMonth,
+            pay_period_start: `${selectedYear}-${getMonthNumber(selectedMonth)}-01`,
+            pay_period_end: `${selectedYear}-${getMonthNumber(selectedMonth)}-31`,
+            payment_date: new Date().toISOString().split('T')[0],
+            work_days: 22,
+            actual_work_days: 22,
+            base_salary: Number(newPayroll.base_salary) || 0,
+            hourly_rate: 0,
+            overtime_rate: 0,
+            performance_bonus: Number(newPayroll.performance_bonus) || 0,
+            special_bonus: Number(newPayroll.special_bonus) || 0,
+            position_allowance: Number(newPayroll.position_allowance) || 0,
+            meal_allowance: Number(newPayroll.meal_allowance) || 0,
+            transport_allowance: Number(newPayroll.transport_allowance) || 0,
+            total_overtime_hours: 0,
+            social_insurance: Number(newPayroll.social_insurance) || 0,
+            personal_tax: Number(newPayroll.personal_tax) || 0,
+            advance_salary: Number(newPayroll.advance_salary) || 0,
+            salary_deduction: Number(newPayroll.salary_deduction) || 0,
+            other_deductions: Number(newPayroll.other_deductions) || 0,
+            status: 'DRAFT',
+            created_by: 1
+          }
+        ]);
+
+      if (error) throw error;
+      alert('급여명세서가 성공적으로 생성되었습니다.');
+      setShowPayrollModal(false);
+      setNewPayroll({
+        employee_id: 0,
+        base_salary: 0,
+        performance_bonus: 0,
+        special_bonus: 0,
+        position_allowance: 0,
+        meal_allowance: 0,
+        transport_allowance: 0,
+        social_insurance: 0,
+        personal_tax: 0,
+        advance_salary: 0,
+        salary_deduction: 0,
+        other_deductions: 0
+      });
+      loadData();
+    } catch (error) {
+      console.error('급여명세서 생성 오류:', error);
+      alert(`급여명세서 생성 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+  };
+
+  const handleUpdatePayroll = async () => {
+    try {
+      if (!editingPayroll) return;
+
+      const { data, error } = await supabase
+        .from('payroll_statements')
+        .update({
+          base_salary: editingPayroll.base_salary,
+          performance_bonus: editingPayroll.performance_bonus,
+          special_bonus: editingPayroll.special_bonus,
+          position_allowance: editingPayroll.position_allowance,
+          meal_allowance: editingPayroll.meal_allowance,
+          transport_allowance: editingPayroll.transport_allowance,
+          social_insurance: editingPayroll.social_insurance,
+          personal_tax: editingPayroll.personal_tax,
+          advance_salary: editingPayroll.advance_salary,
+          salary_deduction: editingPayroll.salary_deduction,
+          other_deductions: editingPayroll.other_deductions,
+          status: editingPayroll.status
+        })
+        .eq('id', editingPayroll.id);
+
+      if (error) throw error;
+      alert('급여명세서가 성공적으로 수정되었습니다.');
+      setShowPayrollModal(false);
+      setEditingPayroll(null);
+      loadData();
+    } catch (error) {
+      console.error('급여명세서 수정 오류:', error);
+      alert('급여명세서 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handlePayrollStatusChange = async (payrollId: number, status: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('payroll_statements')
+        .update({ status })
+        .eq('id', payrollId);
+
+      if (error) throw error;
+      alert(`급여명세서 상태가 ${status === 'APPROVED' ? '승인' : '반려'}되었습니다.`);
+      loadData();
+    } catch (error) {
+      console.error('급여명세서 상태 변경 오류:', error);
+      alert('상태 변경 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 직원관리 핸들러 함수들
+  const handleAddEmployee = async () => {
+    try {
+      // 필수 필드 검증
+      if (!newEmployee.employee_code.trim()) {
+        alert('직원코드를 입력해주세요.');
+        return;
+      }
+      if (!newEmployee.nick_name.trim()) {
+        alert('닉네임을 입력해주세요.');
+        return;
+      }
+      if (!newEmployee.full_name.trim()) {
+        alert('전체이름을 입력해주세요.');
+        return;
+      }
+
+      // 직원코드 중복 검사
+      const { data: existingEmployee, error: checkError } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('employee_code', newEmployee.employee_code.trim())
+        .single();
+
+      if (existingEmployee) {
+        alert('이미 존재하는 직원코드입니다. 다른 직원코드를 사용해주세요.');
+        return;
+      }
+
+      // 기본값 설정
+      const employeeData = {
+        ...newEmployee,
+        employee_code: newEmployee.employee_code.trim(),
+        nick_name: newEmployee.nick_name.trim(),
+        full_name: newEmployee.full_name.trim(),
+        full_name_thai: newEmployee.full_name_thai.trim(),
+        bank_name: newEmployee.bank_name.trim(),
+        bank_account: newEmployee.bank_account.trim(),
+        monthly_salary: newEmployee.monthly_salary || 0,
+        social_insurance_rate: newEmployee.social_insurance_rate || 5,
+        tax_rate: newEmployee.tax_rate || 10,
+        performance_rating: newEmployee.performance_rating || 3,
+        status: newEmployee.status || 'ACTIVE',
+        start_date: newEmployee.start_date || new Date().toISOString().split('T')[0]
+      };
+
+      const { data, error } = await supabase
+        .from('employees')
+        .insert([employeeData]);
+
+      if (error) {
+        console.error('Supabase 오류:', error);
+        if (error.code === '23505') {
+          alert('이미 존재하는 직원코드입니다.');
+        } else {
+          alert(`직원 추가 중 오류가 발생했습니다: ${error.message}`);
+        }
+        return;
+      }
+
+      alert('직원이 성공적으로 추가되었습니다!');
+      setShowEmployeeModal(false);
+      
+      // 폼 초기화
+      setNewEmployee({
+        employee_code: '',
+        nick_name: '',
+        full_name: '',
+        full_name_thai: '',
+        department: 'IT',
+        start_date: '',
+        bank_name: '',
+        bank_account: '',
+        monthly_salary: 0,
+        social_insurance_rate: 5,
+        tax_rate: 10,
+        performance_rating: 3,
+        status: 'ACTIVE'
+      });
+      
+      loadData();
+    } catch (error) {
+      console.error('직원 추가 오류:', error);
+      alert('직원 추가 중 오류가 발생했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const handleUpdateEmployee = async () => {
+    try {
+      if (!editingEmployee) return;
+
+      const { data, error } = await supabase
+        .from('employees')
+        .update(editingEmployee)
+        .eq('id', editingEmployee.id);
+
+      if (error) throw error;
+      alert('직원 정보가 성공적으로 수정되었습니다.');
+      setShowEmployeeModal(false);
+      setEditingEmployee(null);
+      loadData();
+    } catch (error) {
+      console.error('직원 수정 오류:', error);
+      alert('직원 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleEmployeeStatusChange = async (employeeId: number, status: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .update({ status })
+        .eq('id', employeeId);
+
+      if (error) throw error;
+      alert(`직원 상태가 ${status === 'ACTIVE' ? '활성' : status === 'INACTIVE' ? '비활성' : '퇴사'}로 변경되었습니다.`);
+      loadData();
+    } catch (error) {
+      console.error('직원 상태 변경 오류:', error);
+      alert('상태 변경 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 오버타임 핸들러 함수들
+  const handleAddOvertime = async () => {
+    try {
+      if (!newOvertime.employee_id || !newOvertime.overtime_date || !newOvertime.start_time || !newOvertime.end_time) {
+        alert('필수 필드를 입력해주세요.');
+        return;
+      }
+
+      // 해당 월의 급여명세서 ID 찾기
+      const overtimeDate = new Date(newOvertime.overtime_date);
+      const year = overtimeDate.getFullYear();
+      const month = overtimeDate.getMonth() + 1;
+      const monthNames = [
+        'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+        'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+      ];
+      const monthName = monthNames[month - 1];
+
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payroll_statements')
+        .select('id')
+        .eq('employee_id', newOvertime.employee_id)
+        .eq('pay_year', year)
+        .eq('pay_month', monthName)
+        .single();
+
+      if (payrollError || !payrollData) {
+        alert('해당 월의 급여명세서를 찾을 수 없습니다. 먼저 급여명세서를 생성해주세요.');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('overtime_records')
+        .insert([
+          {
+            payroll_id: payrollData.id,
+            employee_id: newOvertime.employee_id,
+            overtime_date: newOvertime.overtime_date,
+            start_time: newOvertime.start_time,
+            end_time: newOvertime.end_time,
+            work_description: newOvertime.work_description,
+            reason: newOvertime.reason,
+            priority: newOvertime.priority,
+            status: 'PENDING',
+            created_by: 1
+          }
+        ]);
+
+      if (error) throw error;
+      alert('오버타임이 성공적으로 추가되었습니다.');
+      setShowOvertimeModal(false);
+      setNewOvertime({
+        employee_id: 0,
+        overtime_date: '',
+        start_time: '',
+        end_time: '',
+        work_description: '',
+        reason: 'OTHER',
+        priority: 'MEDIUM'
+      });
+      loadData();
+    } catch (error) {
+      console.error('오버타임 추가 오류:', error);
+      alert('오버타임 추가 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleUpdateOvertime = async () => {
+    try {
+      if (!editingOvertime) return;
+
+      // 해당 월의 급여명세서 ID 찾기 (날짜가 변경된 경우)
+      const overtimeDate = new Date(editingOvertime.overtime_date);
+      const year = overtimeDate.getFullYear();
+      const month = overtimeDate.getMonth() + 1;
+      const monthNames = [
+        'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+        'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+      ];
+      const monthName = monthNames[month - 1];
+
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('payroll_statements')
+        .select('id')
+        .eq('employee_id', editingOvertime.employee_id)
+        .eq('pay_year', year)
+        .eq('pay_month', monthName)
+        .single();
+
+      if (payrollError || !payrollData) {
+        alert('해당 월의 급여명세서를 찾을 수 없습니다. 먼저 급여명세서를 생성해주세요.');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('overtime_records')
+        .update({
+          payroll_id: payrollData.id,
+          overtime_date: editingOvertime.overtime_date,
+          start_time: editingOvertime.start_time,
+          end_time: editingOvertime.end_time,
+          work_description: editingOvertime.work_description,
+          reason: editingOvertime.reason,
+          priority: editingOvertime.priority
+        })
+        .eq('id', editingOvertime.id);
+
+      if (error) throw error;
+      alert('오버타임이 성공적으로 수정되었습니다.');
+      setShowOvertimeModal(false);
+      setEditingOvertime(null);
+      loadData();
+    } catch (error) {
+      console.error('오버타임 수정 오류:', error);
+      alert('오버타임 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const generateEmployeeReport = () => {
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    // 부서별 통계
+    const departmentStats = employees.reduce((acc, emp) => {
+      if (!acc[emp.department]) {
+        acc[emp.department] = { count: 0, totalSalary: 0, active: 0, inactive: 0 };
+      }
+      acc[emp.department].count++;
+      acc[emp.department].totalSalary += Number(emp.monthly_salary);
+      if (emp.status === 'ACTIVE') {
+        acc[emp.department].active++;
+      } else {
+        acc[emp.department].inactive++;
+      }
+      return acc;
+    }, {} as any);
+
+    // 이번 달 입사/퇴사 통계
+    const newEmployeesThisMonth = employees.filter(emp => {
+      const startDate = new Date(emp.start_date);
+      return startDate.getMonth() + 1 === currentMonth && startDate.getFullYear() === currentYear;
+    });
+
+    let reportContent = `
+      직원 관리 종합 리포트
+      ====================
+      생성일: ${new Date().toLocaleDateString()}
+      보고기간: ${currentYear}년 ${currentMonth}월
+      
+      📊 전체 현황
+      - 총 직원수: ${employees.length}명
+      - 활성 직원: ${employees.filter(emp => emp.status === 'ACTIVE').length}명
+      - 비활성 직원: ${employees.filter(emp => emp.status !== 'ACTIVE').length}명
+      - 이번 달 신규 입사: ${newEmployeesThisMonth.length}명
+      
+      💰 급여 현황
+      - 총 급여 지출: ₩${employees.reduce((sum, emp) => sum + Number(emp.monthly_salary), 0).toLocaleString()}
+      - 평균 급여: ₩${(employees.reduce((sum, emp) => sum + Number(emp.monthly_salary), 0) / employees.length).toLocaleString()}
+      
+      🏢 부서별 현황
+    `;
+
+    Object.entries(departmentStats).forEach(([dept, stats]: [string, any]) => {
+      reportContent += `
+      ${dept} 부서:
+      - 직원수: ${stats.count}명 (활성: ${stats.active}명, 비활성: ${stats.inactive}명)
+      - 총 급여: ₩${stats.totalSalary.toLocaleString()}
+      - 평균 급여: ₩${(stats.totalSalary / stats.count).toLocaleString()}
+      `;
+    });
+
+    reportContent += `
+      
+      👥 신규 입사 직원 (이번 달)
+    `;
+
+    newEmployeesThisMonth.forEach(emp => {
+      reportContent += `
+      - ${emp.nick_name} (${emp.employee_code})
+        부서: ${emp.department}
+        급여: ₩${emp.monthly_salary.toLocaleString()}
+        입사일: ${emp.start_date}
+      `;
+    });
+
+    // 새 창에서 보고서 출력
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>직원 관리 종합 리포트</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+              .content { white-space: pre-line; font-family: monospace; font-size: 14px; }
+              .footer { margin-top: 30px; text-align: center; border-top: 1px solid #ccc; padding-top: 20px; }
+              .section { margin: 20px 0; }
+              .highlight { background-color: #f0f0f0; padding: 10px; border-radius: 5px; }
+              @media print {
+                body { margin: 0; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>직원 관리 종합 리포트</h1>
+              <p>${currentYear}년 ${currentMonth}월</p>
+            </div>
+            <div class="content">${reportContent}</div>
+            <div class="footer">
+              <p>생성일: ${new Date().toLocaleDateString()}</p>
+              <button class="no-print" onclick="window.print()">인쇄</button>
+              <button class="no-print" onclick="window.close()">닫기</button>
+            </div>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+    }
+  };
+
+  const generateDashboardReport = () => {
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    // 월별 통계 계산
+    const newEmployeesThisMonth = employees.filter(emp => {
+      const hireDate = new Date(emp.hire_date);
+      return hireDate.getMonth() + 1 === currentMonth && hireDate.getFullYear() === currentYear;
+    }).length;
+    
+    const leftEmployeesThisMonth = employees.filter(emp => {
+      if (!emp.termination_date) return false;
+      const terminationDate = new Date(emp.termination_date);
+      return terminationDate.getMonth() + 1 === currentMonth && terminationDate.getFullYear() === currentYear;
+    }).length;
+    
+    const overtimeAmountThisMonth = overtimeData
+      .filter(ot => {
+        const overtimeDate = new Date(ot.overtime_date);
+        return overtimeDate.getMonth() + 1 === currentMonth && 
+               overtimeDate.getFullYear() === currentYear &&
+               ot.status === 'APPROVED';
+      })
+      .reduce((sum, ot) => {
+        const employee = ot.employees as any;
+        const hourlyRate = employee?.hourly_rate || 0;
+        return sum + (ot.overtime_hours * hourlyRate);
+      }, 0);
+    
+    const overtimeAmountThisYear = overtimeData
+      .filter(ot => {
+        const overtimeDate = new Date(ot.overtime_date);
+        return overtimeDate.getFullYear() === currentYear && ot.status === 'APPROVED';
+      })
+      .reduce((sum, ot) => {
+        const employee = ot.employees as any;
+        const hourlyRate = employee?.hourly_rate || 0;
+        return sum + (ot.overtime_hours * hourlyRate);
+      }, 0);
+    
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const lastMonthPayroll = payrollData.filter(payroll => {
+      const payrollDate = new Date(payroll.pay_period_start);
+      return payrollDate.getMonth() + 1 === lastMonth && payrollDate.getFullYear() === lastMonthYear;
+    });
+    const lastMonthTotal = lastMonthPayroll.reduce((sum, payroll) => {
+      const net = payroll.base_salary + 
+                 (payroll.total_overtime_hours * payroll.overtime_rate) + 
+                 payroll.performance_bonus + 
+                 payroll.special_bonus + 
+                 payroll.position_allowance + 
+                 payroll.meal_allowance + 
+                 payroll.transport_allowance - 
+                 payroll.social_insurance - 
+                 payroll.personal_tax - 
+                 payroll.advance_salary - 
+                 payroll.salary_deduction - 
+                 payroll.other_deductions;
+      return sum + net;
+    }, 0);
+    
+    const thisYearPayroll = payrollData.filter(payroll => {
+      const payrollDate = new Date(payroll.pay_period_start);
+      return payrollDate.getFullYear() === currentYear;
+    });
+    const thisYearTotal = thisYearPayroll.reduce((sum, payroll) => {
+      const net = payroll.base_salary + 
+                 (payroll.total_overtime_hours * payroll.overtime_rate) + 
+                 payroll.performance_bonus + 
+                 payroll.special_bonus + 
+                 payroll.position_allowance + 
+                 payroll.meal_allowance + 
+                 payroll.transport_allowance - 
+                 payroll.social_insurance - 
+                 payroll.personal_tax - 
+                 payroll.advance_salary - 
+                 payroll.salary_deduction - 
+                 payroll.other_deductions;
+      return sum + net;
+    }, 0);
+
+    let reportContent = `
+      대시보드 종합 리포트
+      ====================
+      생성일: ${new Date().toLocaleDateString()}
+      보고기간: ${currentYear}년 ${currentMonth}월
+      
+      📊 인력 현황
+      - 총 직원수: ${totalEmployees}명
+      - 이번 달 입사: ${newEmployeesThisMonth}명
+      - 이번 달 퇴사: ${leftEmployeesThisMonth}명
+      - 승인 대기: ${pendingApprovals}건
+      
+      💰 급여 현황
+      - 이번 달 급여지급액: ₩${totalGrossSalary.toLocaleString()}
+      - 지난달 급여지급액: ₩${lastMonthTotal.toLocaleString()}
+      - 올해 급여 총액: ₩${thisYearTotal.toLocaleString()}
+      
+      ⏰ 오버타임 현황
+      - 이번 달 오버타임: ${totalOvertimeHours}시간
+      - 이번 달 오버타임 금액: ₩${overtimeAmountThisMonth.toLocaleString()}
+      - 올해 오버타임 누적금액: ₩${overtimeAmountThisYear.toLocaleString()}
+      
+      📈 부서별 현황
+    `;
+
+    // 부서별 통계 추가
+    const departments = ['IT', 'HR', 'Finance'];
+    departments.forEach(dept => {
+      const deptEmployees = employees.filter(emp => emp.department === dept);
+      const deptPayroll = payrollData.filter(payroll => {
+        const employee = payroll.employees as any;
+        return employee?.department === dept;
+      });
+      const deptTotal = deptPayroll.reduce((sum, payroll) => {
+        const net = payroll.base_salary + 
+                   (payroll.total_overtime_hours * payroll.overtime_rate) + 
+                   payroll.performance_bonus + 
+                   payroll.special_bonus + 
+                   payroll.position_allowance + 
+                   payroll.meal_allowance + 
+                   payroll.transport_allowance - 
+                   payroll.social_insurance - 
+                   payroll.personal_tax - 
+                   payroll.advance_salary - 
+                   payroll.salary_deduction - 
+                   payroll.other_deductions;
+        return sum + net;
+      }, 0);
+      
+      reportContent += `
+      ${dept} 부서:
+      - 직원수: ${deptEmployees.length}명
+      - 급여 총액: ₩${deptTotal.toLocaleString()}
+      `;
+    });
+
+    // 새 창에서 보고서 출력
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>대시보드 종합 리포트</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+              .content { white-space: pre-line; font-family: monospace; font-size: 14px; }
+              .footer { margin-top: 30px; text-align: center; border-top: 1px solid #ccc; padding-top: 20px; }
+              .section { margin: 20px 0; }
+              .highlight { background-color: #f0f0f0; padding: 10px; border-radius: 5px; }
+              @media print {
+                body { margin: 0; }
+                .no-print { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>대시보드 종합 리포트</h1>
+              <p>${currentYear}년 ${currentMonth}월</p>
+            </div>
+            <div class="content">${reportContent}</div>
+            <div class="footer">
+              <p>생성일: ${new Date().toLocaleDateString()}</p>
+              <button class="no-print" onclick="window.print()">인쇄</button>
+              <button class="no-print" onclick="window.close()">닫기</button>
+            </div>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+    }
+  };
+
+  const Sidebar = () => (
+    <div className={`${sidebarOpen ? 'w-64' : 'w-16'} bg-gray-900 min-h-screen transition-all duration-300 fixed left-0 top-0 z-10`}>
+      <div className="p-4">
+        <div className="flex items-center justify-between">
+          <div className={`flex items-center ${!sidebarOpen && 'hidden'}`}>
+            {companySettings?.logo_url ? (
+              <img 
+                src={companySettings.logo_url} 
+                alt="Company Logo" 
+                className="w-8 h-8 mr-2 rounded"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center mr-2">
+                <span className="text-white font-bold text-sm">💼</span>
+              </div>
+            )}
+            <h1 className="text-white font-bold text-xl">
+              {companySettings?.company_name || '급여관리'}
+            </h1>
+          </div>
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-white hover:bg-gray-800 p-2 rounded"
+          >
+            <Menu size={20} />
+          </button>
+        </div>
+      </div>
+      
+      <nav className="mt-8">
+        {[
+          { id: 'dashboard', label: '대시보드', icon: Home },
+          { id: 'payroll', label: '급여관리', icon: DollarSign },
+          { id: 'overtime', label: '오버타임', icon: Clock },
+          { id: 'employees', label: '직원관리', icon: Users },
+          { id: 'reports', label: '보고서', icon: FileText },
+          { id: 'settings', label: '설정', icon: Settings }
+        ].map(item => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setCurrentView(item.id)}
+              className={`w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors ${
+                currentView === item.id ? 'bg-gray-800 border-r-4 border-blue-500' : ''
+              }`}
+            >
+              <Icon className="text-white" size={20} />
+              <span className={`text-white ml-3 ${!sidebarOpen && 'hidden'}`}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+      
+      <div className="absolute bottom-0 w-full p-4">
+        <button className="w-full flex items-center px-4 py-3 text-left hover:bg-gray-800 transition-colors">
+          <LogOut className="text-white" size={20} />
+          <span className={`text-white ml-3 ${!sidebarOpen && 'hidden'}`}>
+            로그아웃
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+
+  const StatCard = ({ title, value, icon: Icon, trend }: any) => (
+    <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+          <p className="text-2xl font-semibold text-gray-900">{value}</p>
+          {trend && (
+            <p className="text-sm text-green-600 mt-1">
+              <TrendingUp className="inline w-4 h-4 mr-1" />
+              {trend}
+            </p>
+          )}
+        </div>
+        <div className="bg-blue-50 p-3 rounded-full">
+          <Icon className="text-blue-600" size={24} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const DashboardView = () => {
+    // 월별 통계 계산
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    
+    // 이번 달 입사한 직원수
+    const newEmployeesThisMonth = employees.filter(emp => {
+      const hireDate = new Date(emp.hire_date);
+      return hireDate.getMonth() + 1 === currentMonth && hireDate.getFullYear() === currentYear;
+    }).length;
+    
+    // 이번 달 퇴사한 직원수
+    const leftEmployeesThisMonth = employees.filter(emp => {
+      if (!emp.termination_date) return false;
+      const terminationDate = new Date(emp.termination_date);
+      return terminationDate.getMonth() + 1 === currentMonth && terminationDate.getFullYear() === currentYear;
+    }).length;
+    
+    // 이번 달 오버타임 누적금액
+    const overtimeAmountThisMonth = overtimeData
+      .filter(ot => {
+        const overtimeDate = new Date(ot.overtime_date);
+        return overtimeDate.getMonth() + 1 === currentMonth && 
+               overtimeDate.getFullYear() === currentYear &&
+               ot.status === 'APPROVED';
+      })
+      .reduce((sum, ot) => {
+        const employee = ot.employees as any;
+        const hourlyRate = employee?.hourly_rate || 0;
+        return sum + (ot.overtime_hours * hourlyRate);
+      }, 0);
+    
+    // 올해 오버타임 누적금액
+    const overtimeAmountThisYear = overtimeData
+      .filter(ot => {
+        const overtimeDate = new Date(ot.overtime_date);
+        return overtimeDate.getFullYear() === currentYear && ot.status === 'APPROVED';
+      })
+      .reduce((sum, ot) => {
+        const employee = ot.employees as any;
+        const hourlyRate = employee?.hourly_rate || 0;
+        return sum + (ot.overtime_hours * hourlyRate);
+      }, 0);
+    
+    // 지난달 급여 총액
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const lastMonthPayroll = payrollData.filter(payroll => {
+      const payrollDate = new Date(payroll.pay_period_start);
+      return payrollDate.getMonth() + 1 === lastMonth && payrollDate.getFullYear() === lastMonthYear;
+    });
+    const lastMonthTotal = lastMonthPayroll.reduce((sum, payroll) => {
+      const net = payroll.base_salary + 
+                 (payroll.total_overtime_hours * payroll.overtime_rate) + 
+                 payroll.performance_bonus + 
+                 payroll.special_bonus + 
+                 payroll.position_allowance + 
+                 payroll.meal_allowance + 
+                 payroll.transport_allowance - 
+                 payroll.social_insurance - 
+                 payroll.personal_tax - 
+                 payroll.advance_salary - 
+                 payroll.salary_deduction - 
+                 payroll.other_deductions;
+      return sum + net;
+    }, 0);
+    
+    // 올해 급여 총액
+    const thisYearPayroll = payrollData.filter(payroll => {
+      const payrollDate = new Date(payroll.pay_period_start);
+      return payrollDate.getFullYear() === currentYear;
+    });
+    const thisYearTotal = thisYearPayroll.reduce((sum, payroll) => {
+      const net = payroll.base_salary + 
+                 (payroll.total_overtime_hours * payroll.overtime_rate) + 
+                 payroll.performance_bonus + 
+                 payroll.special_bonus + 
+                 payroll.position_allowance + 
+                 payroll.meal_allowance + 
+                 payroll.transport_allowance - 
+                 payroll.social_insurance - 
+                 payroll.personal_tax - 
+                 payroll.advance_salary - 
+                 payroll.salary_deduction - 
+                 payroll.other_deductions;
+      return sum + net;
+    }, 0);
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold text-gray-900">대시보드</h2>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Calendar size={20} className="text-gray-500" />
+              <span className="text-gray-600">{selectedYear}년 {selectedMonth}</span>
+            </div>
+            <button
+              onClick={() => generateDashboardReport()}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <FileText size={16} />
+              <span>대시보드 리포트</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard 
+            title="총 직원수" 
+            value={totalEmployees}
+            icon={Users}
+            trend={`+${newEmployeesThisMonth} 입사, -${leftEmployeesThisMonth} 퇴사`}
+          />
+          <StatCard 
+            title="이번 달 급여지급액" 
+            value={`₩${totalGrossSalary.toLocaleString()}`}
+            icon={DollarSign}
+            trend={`지난달: ₩${lastMonthTotal.toLocaleString()}`}
+          />
+          <StatCard 
+            title="이번 달 오버타임" 
+            value={`${totalOvertimeHours}시간`}
+            icon={Clock}
+            trend={`₩${overtimeAmountThisMonth.toLocaleString()}`}
+          />
+          <StatCard 
+            title="승인 대기" 
+            value={pendingApprovals}
+            icon={FileText}
+            trend="2 pending"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard 
+            title="이번 달 입사" 
+            value={newEmployeesThisMonth}
+            icon={UserPlus}
+            trend="신규 채용"
+          />
+          <StatCard 
+            title="이번 달 퇴사" 
+            value={leftEmployeesThisMonth}
+            icon={UserMinus}
+            trend="인력 감소"
+          />
+          <StatCard 
+            title="올해 오버타임 누적" 
+            value={`₩${overtimeAmountThisYear.toLocaleString()}`}
+            icon={Clock}
+            trend="연간 누적"
+          />
+          <StatCard 
+            title="올해 급여 총액" 
+            value={`₩${thisYearTotal.toLocaleString()}`}
+            icon={DollarSign}
+            trend="연간 누적"
+          />
+        </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold mb-4">부서별 급여 현황</h3>
+          <div className="space-y-4">
+            {['IT', 'HR', 'Finance'].map(dept => {
+              const deptData = payrollData.filter(emp => {
+                const employee = emp.employees as any;
+                return employee?.department === dept;
+              });
+              const deptTotal = deptData.reduce((sum, emp) => {
+                const net = emp.base_salary + 
+                           (emp.total_overtime_hours * emp.overtime_rate) + 
+                           emp.performance_bonus + 
+                           emp.special_bonus + 
+                           emp.position_allowance + 
+                           emp.meal_allowance + 
+                           emp.transport_allowance - 
+                           emp.social_insurance - 
+                           emp.personal_tax - 
+                           emp.advance_salary - 
+                           emp.salary_deduction - 
+                           emp.other_deductions;
+                return sum + net;
+              }, 0);
+              const percentage = totalGrossSalary > 0 ? (deptTotal / totalGrossSalary * 100).toFixed(1) : '0';
+              
+              return (
+                <div key={dept} className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Building size={16} className="text-gray-500 mr-2" />
+                    <span className="font-medium">{dept}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">₩{deptTotal.toLocaleString()}</p>
+                    <p className="text-sm text-gray-500">{percentage}%</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+          <h3 className="text-lg font-semibold mb-4">최근 오버타임 현황</h3>
+          <div className="space-y-3">
+            {overtimeData.slice(0, 5).map(ot => {
+              const employee = ot.employees as any;
+              return (
+                <div key={ot.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <div className="flex items-center">
+                    <User size={16} className="text-gray-500 mr-2" />
+                    <div>
+                      <p className="font-medium text-sm">{employee?.nick_name}</p>
+                      <p className="text-xs text-gray-500">{ot.overtime_date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-sm">{ot.overtime_hours}시간</p>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      ot.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                      ot.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {ot.status}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const PayrollView = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900">급여 관리</h2>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => generatePayrollReport()}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <FileText size={16} />
+            <span>급여 리포트</span>
+          </button>
+          <button 
+            onClick={() => setShowPayrollModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus size={20} className="mr-2" />
+            새 급여명세서
+          </button>
+        </div>
+      </div>
+
+      {/* 급여명세서가 없는 직원들 안내 */}
+      {employeesWithoutPayroll.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">
+                급여명세서가 없는 직원이 있습니다
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>
+                  다음 {employeesWithoutPayroll.length}명의 직원에 대한 급여명세서를 생성해야 합니다:
+                </p>
+                <ul className="mt-1 list-disc list-inside">
+                  {employeesWithoutPayroll.slice(0, 3).map(emp => (
+                    <li key={emp.id}>
+                      {emp.nick_name} ({emp.employee_code}) - {emp.department}
+                    </li>
+                  ))}
+                  {employeesWithoutPayroll.length > 3 && (
+                    <li>... 및 {employeesWithoutPayroll.length - 3}명 더</li>
+                  )}
+                </ul>
+                <p className="mt-2">
+                  <strong>"새 급여명세서"</strong> 버튼을 클릭하여 급여명세서를 생성하세요.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="직원 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <button className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <Filter size={16} className="mr-2" />
+                필터
+              </button>
+            </div>
+            <div className="flex items-center space-x-2">
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value="JANUARY">1월</option>
+                <option value="FEBRUARY">2월</option>
+                <option value="MARCH">3월</option>
+                <option value="APRIL">4월</option>
+                <option value="MAY">5월</option>
+                <option value="JUNE">6월</option>
+                <option value="JULY">7월</option>
+                <option value="AUGUST">8월</option>
+                <option value="SEPTEMBER">9월</option>
+                <option value="OCTOBER">10월</option>
+                <option value="NOVEMBER">11월</option>
+                <option value="DECEMBER">12월</option>
+              </select>
+              <select 
+                value={selectedYear} 
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-2"
+              >
+                <option value={2024}>2024</option>
+                <option value={2025}>2025</option>
+                <option value={2026}>2026</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">직원</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">부서</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기본급</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">오버타임</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">보너스</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">총 급여</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">공제</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">실수령액</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredPayrollData.map(emp => {
+                const employee = emp.employees as any;
+                const grossSalary = emp.base_salary + 
+                                   (emp.total_overtime_hours * emp.overtime_rate) + 
+                                   emp.performance_bonus + 
+                                   emp.special_bonus + 
+                                   emp.position_allowance + 
+                                   emp.meal_allowance + 
+                                   emp.transport_allowance;
+                const totalDeductions = emp.social_insurance + 
+                                       emp.personal_tax + 
+                                       emp.advance_salary + 
+                                       emp.salary_deduction + 
+                                       emp.other_deductions;
+                const netSalary = grossSalary - totalDeductions;
+
+                return (
+                  <tr key={emp.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600">
+                              {employee?.nick_name?.charAt(0)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{employee?.nick_name}</div>
+                          <div className="text-sm text-gray-500">{employee?.employee_code}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{employee?.department}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₩{emp.base_salary.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {emp.total_overtime_hours}시간 (₩{(emp.total_overtime_hours * emp.overtime_rate).toLocaleString()})
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ₩{(emp.performance_bonus + emp.special_bonus).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₩{grossSalary.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₩{totalDeductions.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">₩{netSalary.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        emp.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                        emp.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        emp.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {emp.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => {
+                            setEditingPayroll(emp);
+                            setShowPayrollModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="상세보기"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setEditingPayroll(emp);
+                            setShowPayrollModal(true);
+                          }}
+                          className="text-green-600 hover:text-green-900"
+                          title="수정"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        {emp.status === 'PENDING' && (
+                          <>
+                            <button 
+                              onClick={() => handlePayrollStatusChange(emp.id, 'APPROVED')}
+                              className="text-green-600 hover:text-green-900"
+                              title="승인"
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handlePayrollStatusChange(emp.id, 'REJECTED')}
+                              className="text-red-600 hover:text-red-900"
+                              title="반려"
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  const OvertimeView = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900">오버타임 관리</h2>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => generateOvertimeReport()}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <FileText size={16} />
+            <span>오버타임 리포트</span>
+          </button>
+          <button 
+            onClick={() => setShowOvertimeModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus size={20} className="mr-2" />
+            오버타임 등록
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">직원</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">시간</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">업무 내용</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">우선순위</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {overtimeData.map(ot => {
+                const employee = ot.employees as any;
+                return (
+                  <tr key={ot.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600">
+                              {employee?.nick_name?.charAt(0)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{employee?.nick_name}</div>
+                          <div className="text-sm text-gray-500">{employee?.employee_code}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ot.overtime_date}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {ot.start_time} - {ot.end_time} ({ot.overtime_hours}시간)
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{ot.work_description}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        ot.priority === 'HIGH' ? 'bg-red-100 text-red-800' :
+                        ot.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {ot.priority}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        ot.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                        ot.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {ot.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      {ot.status === 'PENDING' && (
+                        <div className="flex space-x-2">
+                          <button 
+                            onClick={() => handleOvertimeAction(ot.id, 'APPROVE')}
+                            className="text-green-600 hover:text-green-900"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleOvertimeAction(ot.id, 'REJECT')}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  const EmployeesView = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-semibold text-gray-900">직원 관리</h2>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => generateEmployeeReport()}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <FileText size={16} />
+            <span>직원 리포트</span>
+          </button>
+          <button 
+            onClick={() => setShowEmployeeModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus size={20} className="mr-2" />
+            새 직원 등록
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">직원</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">부서</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">입사일</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">월급</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">성과평가</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">액션</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {employees.map(emp => (
+                <tr key={emp.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600">
+                            {emp.nick_name.charAt(0)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{emp.nick_name}</div>
+                        <div className="text-sm text-gray-500">{emp.employee_code}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{emp.department}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{emp.start_date}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₩{emp.monthly_salary.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{emp.performance_rating}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      emp.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                      emp.status === 'INACTIVE' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {emp.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={() => {
+                          setEditingEmployee(emp);
+                          setShowEmployeeModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="상세보기"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setEditingEmployee(emp);
+                          setShowEmployeeModal(true);
+                        }}
+                        className="text-green-600 hover:text-green-900"
+                        title="수정"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      {emp.status === 'ACTIVE' && (
+                        <button 
+                          onClick={() => handleEmployeeStatusChange(emp.id, 'INACTIVE')}
+                          className="text-yellow-600 hover:text-yellow-900"
+                          title="비활성화"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                      {emp.status === 'INACTIVE' && (
+                        <button 
+                          onClick={() => handleEmployeeStatusChange(emp.id, 'ACTIVE')}
+                          className="text-green-600 hover:text-green-900"
+                          title="활성화"
+                        >
+                          <Check size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  const SettingsView = () => {
+    const [showAdminModal, setShowAdminModal] = useState(false);
+    const [showLogoModal, setShowLogoModal] = useState(false);
+    const [newAdmin, setNewAdmin] = useState({
+      username: '',
+      password: '',
+      full_name: '',
+      email: '',
+      role: 'HR_ADMIN',
+      department: ''
+    });
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string>('');
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setLogoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setLogoPreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    const handleLogoUpload = async () => {
+      if (!logoFile) {
+        alert('로고 파일을 선택해주세요.');
+        return;
+      }
+
+      try {
+        // 파일 크기 체크 (5MB 제한)
+        if (logoFile.size > 5 * 1024 * 1024) {
+          alert('파일 크기는 5MB 이하여야 합니다.');
+          return;
+        }
+
+        // 파일 타입 체크
+        if (!logoFile.type.startsWith('image/')) {
+          alert('이미지 파일만 업로드 가능합니다.');
+          return;
+        }
+
+        // Supabase Storage에 파일 업로드
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `company-logo-${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('logos')
+          .upload(fileName, logoFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('로고 업로드 오류:', uploadError);
+          alert('로고 업로드 중 오류가 발생했습니다.');
+          return;
+        }
+
+        // 업로드된 파일의 공개 URL 가져오기
+        const { data: urlData } = supabase.storage
+          .from('logos')
+          .getPublicUrl(fileName);
+
+        // 데이터베이스에 로고 정보 저장
+        const { error: dbError } = await supabase
+          .from('company_settings')
+          .upsert({
+            id: 1, // 기본 설정 ID
+            logo_url: urlData.publicUrl,
+            logo_filename: fileName,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          });
+
+        if (dbError) {
+          console.error('데이터베이스 저장 오류:', dbError);
+          alert('로고 정보 저장 중 오류가 발생했습니다.');
+          return;
+        }
+
+        alert('로고가 성공적으로 업데이트되었습니다!');
+        setShowLogoModal(false);
+        setLogoFile(null);
+        setLogoPreview('');
+        
+        // 페이지 새로고침으로 로고 업데이트
+        window.location.reload();
+        
+      } catch (error) {
+        console.error('로고 업로드 오류:', error);
+        alert('로고 업로드 중 오류가 발생했습니다.');
+      }
+    };
+
+    const handleAddAdmin = async () => {
+      try {
+        if (!newAdmin.username || !newAdmin.password || !newAdmin.full_name) {
+          alert('필수 필드를 입력해주세요.');
+          return;
+        }
+        alert('관리자가 성공적으로 추가되었습니다!');
+        setShowAdminModal(false);
+        setNewAdmin({
+          username: '',
+          password: '',
+          full_name: '',
+          email: '',
+          role: 'HR_ADMIN',
+          department: ''
+        });
+      } catch (error) {
+        alert('관리자 추가 중 오류가 발생했습니다.');
+      }
+    };
+
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">설정</h1>
+          <p className="text-gray-600">시스템 설정 및 관리자 관리</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 관리자 관리 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">관리자 관리</h2>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">admin</p>
+                  <p className="text-sm text-gray-600">System Administrator</p>
+                </div>
+                <span className="px-2 py-1 text-xs bg-pink-500 text-white rounded-full">SUPER_ADMIN</span>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">hr_admin</p>
+                  <p className="text-sm text-gray-600">HR Administrator</p>
+                </div>
+                <span className="px-2 py-1 text-xs bg-blue-600 text-white rounded-full">HR_ADMIN</span>
+              </div>
+              <button
+                onClick={() => setShowAdminModal(true)}
+                className="w-full bg-pink-500 text-white py-2 rounded-lg hover:bg-pink-600 transition-colors"
+              >
+                새 관리자 추가
+              </button>
+            </div>
+          </div>
+
+          {/* 로고 설정 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">로고 설정</h2>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-pink-500 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">💼</span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">현재 로고</p>
+                  <p className="text-sm text-gray-600">기본 아이콘</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLogoModal(true)}
+                className="w-full bg-pink-500 text-white py-2 rounded-lg hover:bg-pink-600 transition-colors"
+              >
+                로고 변경
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 관리자 추가 모달 */}
+        {showAdminModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">새 관리자 추가</h2>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="사용자명"
+                  className="w-full p-2 border rounded text-gray-900"
+                  value={newAdmin.username}
+                  onChange={(e) => setNewAdmin({...newAdmin, username: e.target.value})}
+                />
+                <input
+                  type="password"
+                  placeholder="비밀번호"
+                  className="w-full p-2 border rounded text-gray-900"
+                  value={newAdmin.password}
+                  onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})}
+                />
+                <input
+                  type="text"
+                  placeholder="전체 이름"
+                  className="w-full p-2 border rounded text-gray-900"
+                  value={newAdmin.full_name}
+                  onChange={(e) => setNewAdmin({...newAdmin, full_name: e.target.value})}
+                />
+                <input
+                  type="email"
+                  placeholder="이메일"
+                  className="w-full p-2 border rounded text-gray-900"
+                  value={newAdmin.email}
+                  onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
+                />
+                <select
+                  className="w-full p-2 border rounded text-gray-900"
+                  value={newAdmin.role}
+                  onChange={(e) => setNewAdmin({...newAdmin, role: e.target.value})}
+                >
+                  <option value="HR_ADMIN">HR 관리자</option>
+                  <option value="FINANCE_ADMIN">재무 관리자</option>
+                  <option value="SUPER_ADMIN">시스템 관리자</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="부서"
+                  className="w-full p-2 border rounded text-gray-900"
+                  value={newAdmin.department}
+                  onChange={(e) => setNewAdmin({...newAdmin, department: e.target.value})}
+                />
+              </div>
+              <div className="flex space-x-2 mt-6">
+                <button
+                  onClick={handleAddAdmin}
+                  className="flex-1 bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition-colors"
+                >
+                  추가
+                </button>
+                <button
+                  onClick={() => setShowAdminModal(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 로고 변경 모달 */}
+        {showLogoModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">로고 변경</h2>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <label htmlFor="logo-upload" className="cursor-pointer">
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="로고 미리보기" className="w-32 h-32 mx-auto object-contain" />
+                    ) : (
+                      <div>
+                        <div className="w-32 h-32 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
+                          <span className="text-gray-400">📁</span>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-600">클릭하여 로고 파일 선택</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500">지원 형식: PNG, JPG, SVG (최대 2MB)</p>
+              </div>
+              <div className="flex space-x-2 mt-6">
+                <button
+                  onClick={handleLogoUpload}
+                  disabled={!logoFile}
+                  className="flex-1 bg-pink-500 text-white py-2 rounded hover:bg-pink-600 transition-colors disabled:opacity-50"
+                >
+                  업로드
+                </button>
+                <button
+                  onClick={() => setShowLogoModal(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const ReportsView = () => {
+    const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
+
+    const generatePayrollReport = (employeeId?: number) => {
+      const targetData = employeeId 
+        ? payrollData.filter(emp => emp.employee_id === employeeId)
+        : payrollData;
+
+      let reportContent = `
+        급여명세서 보고서
+        ====================
+        생성일: ${new Date().toLocaleDateString()}
+        기간: ${selectedYear}년 ${selectedMonth}
+        
+      `;
+
+      targetData.forEach(emp => {
+        const employee = emp.employees as any;
+        const grossSalary = emp.base_salary + 
+                          (emp.total_overtime_hours * emp.overtime_rate) + 
+                          emp.performance_bonus + 
+                          emp.special_bonus + 
+                          emp.position_allowance + 
+                          emp.meal_allowance + 
+                          emp.transport_allowance;
+        const netSalary = grossSalary - emp.social_insurance - emp.personal_tax - emp.advance_salary - emp.salary_deduction - emp.other_deductions;
+
+        reportContent += `
+        직원: ${employee?.nick_name} (${employee?.employee_code})
+        부서: ${employee?.department}
+        기본급: ฿${emp.base_salary.toLocaleString()}
+        성과보너스: ฿${emp.performance_bonus.toLocaleString()}
+        특별보너스: ฿${emp.special_bonus.toLocaleString()}
+        오버타임: ${emp.total_overtime_hours}시간 (฿${(emp.total_overtime_hours * emp.overtime_rate).toLocaleString()})
+        총 급여: ฿${grossSalary.toLocaleString()}
+        실수령액: ฿${netSalary.toLocaleString()}
+        상태: ${emp.status}
+        ----------------------------------------
+        `;
+      });
+
+      // 새 창에서 보고서 출력
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(`
+          <html>
+            <head>
+              <title>급여명세서 보고서</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .content { white-space: pre-line; font-family: monospace; }
+                .footer { margin-top: 30px; text-align: center; }
+                @media print {
+                  body { margin: 0; }
+                  .no-print { display: none; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>급여명세서 보고서</h1>
+                <p>${selectedYear}년 ${selectedMonth}</p>
+              </div>
+              <div class="content">${reportContent}</div>
+              <div class="footer">
+                <p>생성일: ${new Date().toLocaleDateString()}</p>
+                <button class="no-print" onclick="window.print()">인쇄</button>
+                <button class="no-print" onclick="window.close()">닫기</button>
+              </div>
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
+      }
+    };
+
+    const generateOvertimeReport = () => {
+      let reportContent = `
+        오버타임 보고서
+        ====================
+        생성일: ${new Date().toLocaleDateString()}
+        기간: ${selectedYear}년 ${selectedMonth}
+        
+      `;
+
+      overtimeData.forEach(item => {
+        const employee = item.employees as any;
+        reportContent += `
+        직원: ${employee?.nick_name} (${employee?.employee_code})
+        날짜: ${new Date(item.overtime_date).toLocaleDateString()}
+        시간: ${item.start_time} - ${item.end_time} (${item.overtime_hours}시간)
+        작업: ${item.work_description}
+        상태: ${item.status}
+        ----------------------------------------
+        `;
+      });
+
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(`
+          <html>
+            <head>
+              <title>오버타임 보고서</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .content { white-space: pre-line; font-family: monospace; }
+                .footer { margin-top: 30px; text-align: center; }
+                @media print {
+                  body { margin: 0; }
+                  .no-print { display: none; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>오버타임 보고서</h1>
+                <p>${selectedYear}년 ${selectedMonth}</p>
+              </div>
+              <div class="content">${reportContent}</div>
+              <div class="footer">
+                <p>생성일: ${new Date().toLocaleDateString()}</p>
+                <button class="no-print" onclick="window.print()">인쇄</button>
+                <button class="no-print" onclick="window.close()">닫기</button>
+              </div>
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
+      }
+    };
+
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">보고서</h1>
+          <p className="text-gray-600">급여 및 오버타임 보고서 생성</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* 급여명세서 보고서 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">급여명세서 보고서</h2>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <select
+                  className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"
+                  value={selectedEmployee || ''}
+                  onChange={(e) => setSelectedEmployee(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">전체 직원</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nick_name} ({emp.employee_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={() => generatePayrollReport(selectedEmployee || undefined)}
+                className="w-full bg-pink-500 text-white py-2 rounded-lg hover:bg-pink-600 transition-colors"
+              >
+                급여명세서 생성
+              </button>
+            </div>
+          </div>
+
+          {/* 오버타임 보고서 */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">오버타임 보고서</h2>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {selectedYear}년 {selectedMonth} 오버타임 현황을 포함한 보고서를 생성합니다.
+              </p>
+              <button
+                onClick={generateOvertimeReport}
+                className="w-full bg-pink-500 text-white py-2 rounded-lg hover:bg-pink-600 transition-colors"
+              >
+                오버타임 보고서 생성
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 보고서 통계 */}
+        <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">보고서 통계</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-pink-500">{payrollData.length}</p>
+              <p className="text-sm text-gray-600">급여명세서</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-pink-500">{overtimeData.length}</p>
+              <p className="text-sm text-gray-600">오버타임 기록</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-pink-500">
+                ฿{payrollData.reduce((sum, emp) => sum + emp.base_salary, 0).toLocaleString()}
+              </p>
+              <p className="text-sm text-gray-600">총 기본급</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-pink-500">
+                {payrollData.reduce((sum, emp) => sum + emp.total_overtime_hours, 0)}시간
+              </p>
+              <p className="text-sm text-gray-600">총 오버타임</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <Sidebar />
+      
+      <div className={`${sidebarOpen ? 'ml-64' : 'ml-16'} transition-all duration-300`}>
+        <main className="p-8">
+          {currentView === 'dashboard' && <DashboardView />}
+          {currentView === 'payroll' && <PayrollView />}
+          {currentView === 'overtime' && <OvertimeView />}
+          {currentView === 'employees' && <EmployeesView />}
+          {currentView === 'reports' && <ReportsView />}
+          {currentView === 'settings' && <SettingsView />}
+        </main>
+      </div>
+
+      {/* 급여명세서 모달 */}
+      {showPayrollModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">
+              {editingPayroll ? '급여명세서 수정' : '새 급여명세서 생성'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">직원 선택</label>
+                <select
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.employee_id : newPayroll.employee_id}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, employee_id: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, employee_id: Number(e.target.value)});
+                    }
+                  }}
+                  disabled={!!editingPayroll}
+                >
+                  <option value={0}>직원을 선택하세요</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nick_name} ({emp.employee_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">기본급</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.base_salary : newPayroll.base_salary}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, base_salary: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, base_salary: Number(e.target.value)});
+                    }
+                  }}
+                  onFocus={(e) => {
+                    if (e.target.value === '0') {
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">성과보너스</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.performance_bonus : newPayroll.performance_bonus}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, performance_bonus: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, performance_bonus: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">특별보너스</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.special_bonus : newPayroll.special_bonus}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, special_bonus: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, special_bonus: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">직책수당</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.position_allowance : newPayroll.position_allowance}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, position_allowance: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, position_allowance: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">식대</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.meal_allowance : newPayroll.meal_allowance}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, meal_allowance: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, meal_allowance: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">교통비</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.transport_allowance : newPayroll.transport_allowance}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, transport_allowance: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, transport_allowance: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">사회보험</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.social_insurance : newPayroll.social_insurance}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, social_insurance: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, social_insurance: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">개인소득세</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.personal_tax : newPayroll.personal_tax}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, personal_tax: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, personal_tax: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">선지급금</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.advance_salary : newPayroll.advance_salary}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, advance_salary: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, advance_salary: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">급여공제</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.salary_deduction : newPayroll.salary_deduction}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, salary_deduction: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, salary_deduction: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">기타공제</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingPayroll ? editingPayroll.other_deductions : newPayroll.other_deductions}
+                  onChange={(e) => {
+                    if (editingPayroll) {
+                      setEditingPayroll({...editingPayroll, other_deductions: Number(e.target.value)});
+                    } else {
+                      setNewPayroll({...newPayroll, other_deductions: Number(e.target.value)});
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="flex space-x-2 mt-6">
+              <button
+                onClick={editingPayroll ? handleUpdatePayroll : handleAddPayroll}
+                className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
+              >
+                {editingPayroll ? '수정' : '생성'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowPayrollModal(false);
+                  setEditingPayroll(null);
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 오버타임 모달 */}
+      {showOvertimeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">
+              {editingOvertime ? '오버타임 수정' : '새 오버타임 등록'}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">직원 선택</label>
+                <select
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingOvertime ? editingOvertime.employee_id : newOvertime.employee_id}
+                  onChange={(e) => {
+                    if (editingOvertime) {
+                      setEditingOvertime({...editingOvertime, employee_id: Number(e.target.value)});
+                    } else {
+                      setNewOvertime({...newOvertime, employee_id: Number(e.target.value)});
+                    }
+                  }}
+                  disabled={!!editingOvertime}
+                >
+                  <option value={0}>직원을 선택하세요</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.nick_name} ({emp.employee_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">날짜</label>
+                <input
+                  type="date"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingOvertime ? editingOvertime.overtime_date : newOvertime.overtime_date}
+                  onChange={(e) => {
+                    if (editingOvertime) {
+                      setEditingOvertime({...editingOvertime, overtime_date: e.target.value});
+                    } else {
+                      setNewOvertime({...newOvertime, overtime_date: e.target.value});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">시작 시간</label>
+                <input
+                  type="time"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingOvertime ? editingOvertime.start_time : newOvertime.start_time}
+                  onChange={(e) => {
+                    if (editingOvertime) {
+                      setEditingOvertime({...editingOvertime, start_time: e.target.value});
+                    } else {
+                      setNewOvertime({...newOvertime, start_time: e.target.value});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">종료 시간</label>
+                <input
+                  type="time"
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingOvertime ? editingOvertime.end_time : newOvertime.end_time}
+                  onChange={(e) => {
+                    if (editingOvertime) {
+                      setEditingOvertime({...editingOvertime, end_time: e.target.value});
+                    } else {
+                      setNewOvertime({...newOvertime, end_time: e.target.value});
+                    }
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">우선순위</label>
+                <select
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingOvertime ? editingOvertime.priority : newOvertime.priority}
+                  onChange={(e) => {
+                    if (editingOvertime) {
+                      setEditingOvertime({...editingOvertime, priority: e.target.value as any});
+                    } else {
+                      setNewOvertime({...newOvertime, priority: e.target.value as any});
+                    }
+                  }}
+                >
+                  <option value="LOW">낮음</option>
+                  <option value="MEDIUM">보통</option>
+                  <option value="HIGH">높음</option>
+                  <option value="URGENT">긴급</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">사유</label>
+                <select
+                  className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                  value={editingOvertime ? editingOvertime.reason : newOvertime.reason}
+                  onChange={(e) => {
+                    if (editingOvertime) {
+                      setEditingOvertime({...editingOvertime, reason: e.target.value as any});
+                    } else {
+                      setNewOvertime({...newOvertime, reason: e.target.value as any});
+                    }
+                  }}
+                >
+                  <option value="PROJECT_DEADLINE">프로젝트 마감</option>
+                  <option value="URGENT_TASK">긴급 업무</option>
+                  <option value="SYSTEM_MAINTENANCE">시스템 정비</option>
+                  <option value="MEETING">회의</option>
+                  <option value="OTHER">기타</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">업무 내용</label>
+              <textarea
+                className="w-full p-2 border border-gray-300 rounded text-gray-900"
+                rows={3}
+                value={editingOvertime ? editingOvertime.work_description : newOvertime.work_description}
+                onChange={(e) => {
+                  if (editingOvertime) {
+                    setEditingOvertime({...editingOvertime, work_description: e.target.value});
+                  } else {
+                    setNewOvertime({...newOvertime, work_description: e.target.value});
+                  }
+                }}
+                placeholder="업무 내용을 입력하세요"
+              />
+            </div>
+
+            <div className="flex space-x-2 mt-6">
+              <button
+                onClick={editingOvertime ? handleUpdateOvertime : handleAddOvertime}
+                className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
+              >
+                {editingOvertime ? '수정' : '등록'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowOvertimeModal(false);
+                  setEditingOvertime(null);
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 직원 모달 */}
+      {showEmployeeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {editingEmployee ? '직원 정보 수정' : '새 직원 등록'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowEmployeeModal(false);
+                  setEditingEmployee(null);
+                  // 폼 초기화
+                  setNewEmployee({
+                    employee_code: '',
+                    nick_name: '',
+                    full_name: '',
+                    full_name_thai: '',
+                    department: 'IT',
+                    start_date: '',
+                    bank_name: '',
+                    bank_account: '',
+                    monthly_salary: 0,
+                    social_insurance_rate: 5,
+                    tax_rate: 10,
+                    performance_rating: 3,
+                    status: 'ACTIVE'
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* 기본 정보 섹션 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">기본 정보</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      직원코드 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="예: EMP001"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.employee_code : newEmployee.employee_code}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, employee_code: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, employee_code: e.target.value});
+                        }
+                      }}
+                      disabled={!!editingEmployee}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      닉네임 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="예: 김철수"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.nick_name : newEmployee.nick_name}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, nick_name: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, nick_name: e.target.value});
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      전체이름 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="예: 김철수"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.full_name : newEmployee.full_name}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, full_name: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, full_name: e.target.value});
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">태국어 이름</label>
+                    <input
+                      type="text"
+                      placeholder="예: คิมชอลซู"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.full_name_thai : newEmployee.full_name_thai}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, full_name_thai: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, full_name_thai: e.target.value});
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">부서</label>
+                    <select
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.department : newEmployee.department}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, department: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, department: e.target.value});
+                        }
+                      }}
+                    >
+                      <option value="IT">IT</option>
+                      <option value="HR">HR</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Sales">Sales</option>
+                      <option value="Operations">Operations</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">입사일</label>
+                    <input
+                      type="date"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.start_date : newEmployee.start_date}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, start_date: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, start_date: e.target.value});
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 급여 정보 섹션 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">급여 정보</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">월급 (원)</label>
+                    <input
+                      type="number"
+                      placeholder="예: 3000000"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.monthly_salary : newEmployee.monthly_salary}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, monthly_salary: Number(e.target.value)});
+                        } else {
+                          setNewEmployee({...newEmployee, monthly_salary: Number(e.target.value)});
+                        }
+                      }}
+                      onFocus={(e) => {
+                        if (e.target.value === '0') {
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">성과등급</label>
+                    <select
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.performance_rating : newEmployee.performance_rating}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, performance_rating: Number(e.target.value)});
+                        } else {
+                          setNewEmployee({...newEmployee, performance_rating: Number(e.target.value)});
+                        }
+                      }}
+                    >
+                      <option value={1}>1등급 (최하)</option>
+                      <option value={2}>2등급 (하)</option>
+                      <option value={3}>3등급 (보통)</option>
+                      <option value={4}>4등급 (상)</option>
+                      <option value={5}>5등급 (최상)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">사회보험율 (%)</label>
+                    <input
+                      type="number"
+                      placeholder="예: 5"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.social_insurance_rate : newEmployee.social_insurance_rate}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, social_insurance_rate: Number(e.target.value)});
+                        } else {
+                          setNewEmployee({...newEmployee, social_insurance_rate: Number(e.target.value)});
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">세율 (%)</label>
+                    <input
+                      type="number"
+                      placeholder="예: 10"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.tax_rate : newEmployee.tax_rate}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, tax_rate: Number(e.target.value)});
+                        } else {
+                          setNewEmployee({...newEmployee, tax_rate: Number(e.target.value)});
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 은행 정보 섹션 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">은행 정보</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">은행명</label>
+                    <input
+                      type="text"
+                      placeholder="예: 신한은행"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.bank_name : newEmployee.bank_name}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, bank_name: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, bank_name: e.target.value});
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">계좌번호</label>
+                    <input
+                      type="text"
+                      placeholder="예: 110-123456-789"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.bank_account : newEmployee.bank_account}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, bank_account: e.target.value});
+                        } else {
+                          setNewEmployee({...newEmployee, bank_account: e.target.value});
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 상태 정보 섹션 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">상태 정보</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">상태</label>
+                    <select
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={editingEmployee ? editingEmployee.status : newEmployee.status}
+                      onChange={(e) => {
+                        if (editingEmployee) {
+                          setEditingEmployee({...editingEmployee, status: e.target.value as any});
+                        } else {
+                          setNewEmployee({...newEmployee, status: e.target.value as any});
+                        }
+                      }}
+                    >
+                      <option value="ACTIVE">활성</option>
+                      <option value="INACTIVE">비활성</option>
+                      <option value="TERMINATED">퇴사</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 버튼 영역 */}
+            <div className="flex space-x-3 mt-8 pt-6 border-t border-gray-200">
+              <button
+                onClick={editingEmployee ? handleUpdateEmployee : handleAddEmployee}
+                className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                {editingEmployee ? '수정 완료' : '직원 등록'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowEmployeeModal(false);
+                  setEditingEmployee(null);
+                  // 폼 초기화
+                  setNewEmployee({
+                    employee_code: '',
+                    nick_name: '',
+                    full_name: '',
+                    full_name_thai: '',
+                    department: 'IT',
+                    start_date: '',
+                    bank_name: '',
+                    bank_account: '',
+                    monthly_salary: 0,
+                    social_insurance_rate: 5,
+                    tax_rate: 10,
+                    performance_rating: 3,
+                    status: 'ACTIVE'
+                  });
+                }}
+                className="flex-1 bg-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PayrollDashboard; 

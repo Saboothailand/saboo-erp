@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>급여명세서 - Saboo (Thailand) Co.,Ltd</title>
+    <link rel="stylesheet" href="payroll_styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="settings-btn no-print" onclick="openSettings()">⚙️</button>
+            <div class="company-header">
+                <div class="company-title" id="documentTitle">급여명세서</div>
+                <div class="company-name">
+                    <div class="logo" id="companyLogo">
+                        <span id="logoText">S</span>
+                        <img id="logoImage" style="display: none;" alt="Company Logo">
+                    </div>
+                    <div class="company-info">
+                        <h1 id="companyName">Saboo (Thailand) Co.,Ltd</h1>
+                        <div class="document-title" id="documentSubtitle">급여명세서</div>
+                    </div>
+                    <div class="issue-date">지급일: <span id="issueDate">2025-08-03</span></div>
+                </div>
+                <div class="contact-info">
+                    <div class="contact-item">📍 <span id="companyAddress">55/20 MOO 4, TAMBON BUNG KHAM PROY, AMPHUR LAM LUK KA, PATHUM THANI 12150 THAILAND</span></div>
+                    <div class="contact-item">📞 <span id="companyPhone">TEL. 02-159-9880</span></div>
+                    <div class="contact-item">✉️ <span id="companyEmail">hr@saboo.co.th</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- 기본 정보 -->
+            <div class="employee-basic">
+                <div class="employee-header">기본 정보</div>
+                <div class="employee-grid">
+                    <div class="employee-cell">
+                        <span class="cell-label">성명</span>
+                        <span class="cell-value">John Smith</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">등록번호</span>
+                        <span class="cell-value">SB2024001</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">사번</span>
+                        <span class="cell-value">SB2024001</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">직급</span>
+                        <span class="cell-value">Senior Developer</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">부서</span>
+                        <span class="cell-value">IT Department</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">직급</span>
+                        <span class="cell-value">Senior Developer</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">급여년월</span>
+                        <span class="cell-value">2024년 7월</span>
+                    </div>
+                    <div class="employee-cell">
+                        <span class="cell-label">상태</span>
+                        <span class="cell-value">확정</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 세부 내역 -->
+            <div class="salary-section">
+                <div class="section-header">세부 내역</div>
+                <table class="salary-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="width: 80px;">구분</th>
+                            <th colspan="2">지급①</th>
+                            <th colspan="2">공제②</th>
+                        </tr>
+                        <tr>
+                            <th>임금 항목</th>
+                            <th>지급 금액(원)</th>
+                            <th>공제 항목</th>
+                            <th>공제 금액(원)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td rowspan="7" class="category-cell">여<br>월<br>지<br>급</td>
+                            <td class="item-name">기본급</td>
+                            <td class="amount">45,000</td>
+                            <td class="item-name">소득세</td>
+                            <td class="amount negative">7,200</td>
+                        </tr>
+                        <tr>
+                            <td class="item-name">연장근로수당</td>
+                            <td class="amount positive">5,500</td>
+                            <td class="item-name">국민연금</td>
+                            <td class="amount negative">2,250</td>
+                        </tr>
+                        <tr>
+                            <td class="item-name">야간근로수당</td>
+                            <td class="amount positive">2,200</td>
+                            <td class="item-name">고용보험</td>
+                            <td class="amount negative">450</td>
+                        </tr>
+                        <tr>
+                            <td class="item-name">휴일근로수당</td>
+                            <td class="amount positive">3,300</td>
+                            <td class="item-name">건강보험</td>
+                            <td class="amount negative">2,250</td>
+                        </tr>
+                        <tr>
+                            <td class="item-name">가족수당</td>
+                            <td class="amount positive">8,000</td>
+                            <td class="item-name">장기요양보험</td>
+                            <td class="amount negative">225</td>
+                        </tr>
+                        <tr>
+                            <td class="item-name">식대</td>
+                            <td class="amount positive">15,000</td>
+                            <td class="item-name">노동조합비</td>
+                            <td class="amount negative">500</td>
+                        </tr>
+                        <tr>
+                            <td class="item-name">기타수당</td>
+                            <td class="amount">-</td>
+                            <td class="item-name">기타공제</td>
+                            <td class="amount">-</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td class="category-cell"></td>
+                            <td><strong>지급액 계</strong></td>
+                            <td class="amount"><strong>79,000</strong></td>
+                            <td><strong>공제액 계</strong></td>
+                            <td class="amount negative"><strong>12,875</strong></td>
+                        </tr>
+                        <tr class="final-row">
+                            <td></td>
+                            <td colspan="3"><strong>실수령액(원)</strong></td>
+                            <td class="amount"><strong>66,125</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 계산 방법 (간소화) -->
+            <div class="calculation-section">
+                <div class="section-header">계산 방법</div>
+                <div style="font-size: 12px; color: #666; line-height: 1.4; padding: 10px;">
+                    <p><strong>연장근로수당:</strong> 연장근로시간(10시간) × 5,500원 × 1.5 = 5,500원</p>
+                    <p><strong>야간근로수당:</strong> 야간근로시간(4시간) × 5,500원 × 0.5 = 2,200원</p>
+                    <p><strong>휴일근로수당:</strong> 휴일근로시간(6시간) × 5,500원 × 1.5 = 3,300원</p>
+                    <p><strong>가족수당:</strong> 8,000원 × 1명(배우자) = 8,000원</p>
+                    <p><strong>식대:</strong> 일일 500원 × 30일 = 15,000원</p>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p id="footerDate"><strong>발급일:</strong> <span id="issueDateFooter">2025년 8월 3일</span></p>
+                <p id="footerContact">본 급여명세서에 대한 문의사항은 인사팀으로 연락주시기 바랍니다.</p>
+                <p id="footerSupport">급여 관련 세무 상담은 세무팀에서 지원해드립니다.</p>
+            </div>
+        </div>
+
+        <div class="buttons no-print">
+            <button class="btn" onclick="window.print()">
+                🖨️ 인쇄하기
+            </button>
+            <button class="btn btn-secondary" onclick="downloadPDF()">
+                📄 PDF 저장
+            </button>
+            <button class="btn btn-secondary" onclick="exportData()">
+                📊 데이터 내보내기
+            </button>
+        </div>
+    </div>
+
+    <!-- 설정 모달 -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">회사 정보 설정</h2>
+                <span class="close" onclick="closeSettings()">&times;</span>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">회사 로고</label>
+                <div class="logo-upload" id="logoUpload" onclick="document.getElementById('logoFile').click()">
+                    <div id="logoUploadText">
+                        <p>클릭하거나 이미지를 드래그하여 로고를 업로드하세요</p>
+                        <p style="font-size: 12px; color: #666;">권장 크기: 200x200px, 최대 2MB</p>
+                    </div>
+                    <img id="logoUploadPreview" class="logo-preview" style="display: none;" alt="Logo Preview">
+                </div>
+                <input type="file" id="logoFile" accept="image/*" style="display: none;" onchange="handleLogoUpload(event)">
+                <button class="modal-btn btn-danger" onclick="resetLogo()" style="margin-top: 10px; width: 100%;">기본 로고로 복원</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">회사명</label>
+                <input type="text" id="modalCompanyName" class="form-input" placeholder="회사명을 입력하세요">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">주소</label>
+                <textarea id="modalCompanyAddress" class="form-input" rows="3" placeholder="회사 주소를 입력하세요"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">전화번호</label>
+                <input type="text" id="modalCompanyPhone" class="form-input" placeholder="전화번호를 입력하세요">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">이메일</label>
+                <input type="email" id="modalCompanyEmail" class="form-input" placeholder="이메일을 입력하세요">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">문서 제목</label>
+                <input type="text" id="modalDocumentTitle" class="form-input" placeholder="문서 제목을 입력하세요">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">문서 부제목</label>
+                <input type="text" id="modalDocumentSubtitle" class="form-input" placeholder="문서 부제목을 입력하세요">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">하단 문의사항</label>
+                <textarea id="modalFooterContact" class="form-input" rows="2" placeholder="하단 문의사항을 입력하세요"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">하단 지원사항</label>
+                <textarea id="modalFooterSupport" class="form-input" rows="2" placeholder="하단 지원사항을 입력하세요"></textarea>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn btn-primary" onclick="saveSettings()">저장</button>
+                <button class="modal-btn btn-secondary" onclick="closeSettings()">취소</button>
+                <button class="modal-btn btn-danger" onclick="resetSettings()">초기화</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="payroll_script.js"></script>
+</body>
+</html> 
