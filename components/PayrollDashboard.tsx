@@ -1460,34 +1460,12 @@ const PayrollDashboard = () => {
         return;
       }
 
-      // Storage 버킷 확인 (에러 처리 개선)
-      console.log('Storage 버킷 목록 조회 시작...');
-      
-      // 버킷 목록 조회 시도 (실패해도 계속 진행)
-      try {
-        const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-        
-        if (bucketError) {
-          console.error('버킷 목록 조회 오류:', bucketError);
-          console.error('오류 상세 정보:', {
-            message: bucketError.message,
-            details: bucketError.details,
-            hint: bucketError.hint
-          });
-          console.log('버킷 목록 조회 실패, 직접 업로드 시도...');
-        } else {
-          console.log('사용 가능한 버킷 목록:', buckets?.map(b => b.name));
-          const companyLogosBucketExists = buckets?.some(bucket => bucket.name === 'company-logos');
-          console.log('company-logos 버킷 존재 여부:', companyLogosBucketExists);
-          
-          if (!companyLogosBucketExists) {
-            const availableBuckets = buckets?.map(b => b.name).join(', ') || '없음';
-            console.log('company-logos 버킷이 목록에 없음, 직접 업로드 시도...');
-          }
-        }
-      } catch (error) {
-        console.error('버킷 목록 조회 중 예외 발생:', error);
-        console.log('예외 발생, 직접 업로드 시도...');
+      // dashboard-logos 버킷 확인 및 생성
+      const bucketReady = await ensureLogoStorageBucket();
+      if (!bucketReady) {
+        setIsUploading(false);
+        setUploadProgress(0);
+        return;
       }
 
       // 안전한 파일명 생성
@@ -1495,69 +1473,44 @@ const PayrollDashboard = () => {
       const fileExtension = file.name.split('.').pop();
       const safeFileName = `dashboard_logo_${timestamp}.${fileExtension}`;
 
-      // Supabase Storage에 업로드 (에러 처리 강화)
-      console.log('Storage 업로드 시작:', {
-        bucket: 'company-logos',
-        fileName: safeFileName,
-        fileSize: file.size,
-        fileType: file.type
-      });
+      // dashboard-logos 버킷에 업로드
+      console.log('dashboard-logos 버킷으로 업로드 시도...');
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('dashboard-logos')
+        .upload(safeFileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-      // 여러 버킷 시도
-      const bucketsToTry = ['company-logos', 'dashboard-logos', 'logos'];
-      let uploadSuccess = false;
-      let finalUrl = null;
-      let lastError = null;
-
-      for (const bucketName of bucketsToTry) {
-        try {
-          console.log(`${bucketName} 버킷으로 업로드 시도...`);
-          
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from(bucketName)
-            .upload(safeFileName, file, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (uploadError) {
-            console.error(`${bucketName} 버킷 업로드 실패:`, uploadError);
-            lastError = uploadError;
-            continue;
-          }
-
-          // 공개 URL 생성
-          const { data: urlData } = supabase.storage
-            .from(bucketName)
-            .getPublicUrl(safeFileName);
-
-          if (urlData?.publicUrl) {
-            console.log(`${bucketName} 버킷 업로드 성공!`);
-            uploadSuccess = true;
-            finalUrl = urlData.publicUrl;
-            break;
-          } else {
-            console.error(`${bucketName} 버킷에서 공개 URL 생성 실패`);
-            lastError = new Error('공개 URL 생성 실패');
-          }
-        } catch (error) {
-          console.error(`${bucketName} 버킷 시도 중 예외 발생:`, error);
-          lastError = error;
-        }
-      }
-
-      if (!uploadSuccess) {
-        console.error('모든 버킷 시도 실패:', lastError);
-        alert(`로고 업로드 실패: ${lastError?.message || '알 수 없는 오류'}\n\n시도한 버킷: ${bucketsToTry.join(', ')}`);
+      if (uploadError) {
+        console.error('dashboard-logos 버킷 업로드 실패:', uploadError);
+        alert(`로고 업로드에 실패했습니다: ${uploadError.message}`);
+        setIsUploading(false);
+        setUploadProgress(0);
         return;
       }
+
+      // 공개 URL 생성
+      const { data: urlData } = supabase.storage
+        .from('dashboard-logos')
+        .getPublicUrl(safeFileName);
+
+      if (!urlData?.publicUrl) {
+        alert('로고 URL 생성에 실패했습니다.');
+        setIsUploading(false);
+        setUploadProgress(0);
+        return;
+      }
+
+      console.log('dashboard-logos 버킷 업로드 성공!');
+      const finalUrl = urlData.publicUrl;
 
       // 성공 시 설정 업데이트
       setDashboardSettings({
         ...dashboardSettings,
         logoUrl: finalUrl
       });
-
 
     } catch (error) {
       console.error('로고 업로드 오류:', error);
@@ -2046,6 +1999,47 @@ const PayrollDashboard = () => {
         throw new Error('Storage 버킷(employee-photos)이 존재하지 않습니다. Supabase 대시보드에서 Storage → New bucket → Name: employee-photos, Public bucket 체크 후 생성해주세요.');
       }
     return true;
+  };
+
+  // 로고 업로드 전 버킷 확인
+  const ensureLogoStorageBucket = async () => {
+    try {
+      const { data: buckets, error } = await supabase.storage.listBuckets();
+      if (error) {
+        console.error('Error fetching buckets:', error);
+        return false;
+      }
+      
+      const dashboardLogosBucket = buckets.find(bucket => bucket.name === 'dashboard-logos');
+      
+      if (!dashboardLogosBucket) {
+        try {
+          // 버킷 자동 생성 시도
+          const { data, error: createError } = await supabase.storage.createBucket('dashboard-logos', {
+            public: true,
+            fileSizeLimit: 5242880, // 5MB
+            allowedMimeTypes: ['image/*']
+          });
+          
+          if (createError) {
+            console.error('Error creating dashboard-logos bucket:', createError);
+            alert(`dashboard-logos 버킷 생성에 실패했습니다.\n\nSupabase 대시보드에서 Storage → New bucket → Name: dashboard-logos, Public bucket 체크 후 생성해주세요.\n\n오류: ${createError.message}`);
+            return false;
+          }
+          
+          console.log('dashboard-logos bucket created successfully');
+          return true;
+        } catch (error) {
+          console.error('Error creating bucket:', error);
+          alert(`dashboard-logos 버킷이 존재하지 않습니다.\n현재 사용 가능한 버킷:\n${buckets.map(b => b.name).join(', ') || '없음'}\n\nSupabase 대시보드에서 Storage → New bucket → Name: dashboard-logos, Public bucket 체크 후 생성해주세요.`);
+          return false;
+        }
+      }
+      return true;
+    } catch (error) {
+      console.error('Error checking logo storage bucket:', error);
+      return false;
+    }
   };
 
   // 안전한 파일명 생성 함수
