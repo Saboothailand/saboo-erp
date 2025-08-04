@@ -31,6 +31,7 @@ import {
   Layout
 } from 'lucide-react';
 import { supabase, Employee, PayrollStatement, OvertimeRecord, PointRecord, EmployeePointSummary } from '@/lib/supabase';
+import PayrollStatementComponent from './PayrollStatement';
 
 const PayrollDashboard = () => {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -5017,165 +5018,11 @@ const PayrollDashboard = () => {
 
       {/* 급여 보기 모달 */}
       {showPayrollViewModal && selectedPayroll && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">급여명세서 상세보기</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 기본 정보 */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">기본 정보</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">직원명</label>
-                      <p className="text-gray-900">{(selectedPayroll.employees as any)?.nick_name}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">부서</label>
-                      <p className="text-gray-900">{(selectedPayroll.employees as any)?.department}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">급여년도</label>
-                      <p className="text-gray-900">{selectedPayroll.pay_year}년</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">급여월</label>
-                      <p className="text-gray-900">{selectedPayroll.pay_month}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">지급일</label>
-                      <p className="text-gray-900">{selectedPayroll.payment_date}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">상태</label>
-                      <p className="text-gray-900">{selectedPayroll.status}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 급여 상세 */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">급여 상세</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">기본급</span>
-                      <span className="font-medium">₩{selectedPayroll.base_salary.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">오버타임</span>
-                      <span className="font-medium">₩{(selectedPayroll.total_overtime_hours * selectedPayroll.overtime_rate).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">성과보너스</span>
-                      <span className="font-medium">₩{selectedPayroll.performance_bonus.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">특별보너스</span>
-                      <span className="font-medium">₩{selectedPayroll.special_bonus.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">직책수당</span>
-                      <span className="font-medium">₩{selectedPayroll.position_allowance.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">식대</span>
-                      <span className="font-medium">₩{selectedPayroll.meal_allowance.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">교통비</span>
-                      <span className="font-medium">₩{selectedPayroll.transport_allowance.toLocaleString()}</span>
-                    </div>
-                    <hr className="my-3" />
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>총 지급액</span>
-                      <span className="text-blue-600">₩{(selectedPayroll.base_salary + 
-                        (selectedPayroll.total_overtime_hours * selectedPayroll.overtime_rate) + 
-                        selectedPayroll.performance_bonus + 
-                        selectedPayroll.special_bonus + 
-                        selectedPayroll.position_allowance + 
-                        selectedPayroll.meal_allowance + 
-                        selectedPayroll.transport_allowance).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 공제 내역 */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">공제 내역</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">사회보험</span>
-                      <span className="font-medium">₩{selectedPayroll.social_insurance.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">소득세</span>
-                      <span className="font-medium">₩{selectedPayroll.personal_tax.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">선지급금</span>
-                      <span className="font-medium">₩{selectedPayroll.advance_salary.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">급여공제</span>
-                      <span className="font-medium">₩{selectedPayroll.salary_deduction.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">기타공제</span>
-                      <span className="font-medium">₩{selectedPayroll.other_deductions.toLocaleString()}</span>
-                    </div>
-                    <hr className="my-3" />
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>총 공제액</span>
-                      <span className="text-red-600">₩{(selectedPayroll.social_insurance + 
-                        selectedPayroll.personal_tax + 
-                        selectedPayroll.advance_salary + 
-                        selectedPayroll.salary_deduction + 
-                        selectedPayroll.other_deductions).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 실수령액 */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">실수령액</h3>
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-blue-600">
-                      ₩{(selectedPayroll.base_salary + 
-                        (selectedPayroll.total_overtime_hours * selectedPayroll.overtime_rate) + 
-                        selectedPayroll.performance_bonus + 
-                        selectedPayroll.special_bonus + 
-                        selectedPayroll.position_allowance + 
-                        selectedPayroll.meal_allowance + 
-                        selectedPayroll.transport_allowance - 
-                        selectedPayroll.social_insurance - 
-                        selectedPayroll.personal_tax - 
-                        selectedPayroll.advance_salary - 
-                        selectedPayroll.salary_deduction - 
-                        selectedPayroll.other_deductions).toLocaleString()}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-2">최종 실수령액</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end mt-6">
-              <button
-                onClick={() => setShowPayrollViewModal(false)}
-                className="bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400"
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
+        <PayrollStatementComponent
+          payroll={selectedPayroll}
+          employee={selectedPayroll.employees as Employee}
+          onClose={() => setShowPayrollViewModal(false)}
+        />
       )}
 
       {/* 급여 수정 모달 */}
