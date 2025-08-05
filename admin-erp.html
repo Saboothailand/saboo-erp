@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP 시스템 - 관리자 로그인</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fce7f3 0%, #f3e8ff 50%, #f1f5f9 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(255, 182, 193, 0.1);
+            padding: 48px;
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .logo-container {
+            margin-bottom: 30px;
+        }
+
+        .company-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            object-fit: cover;
+            border: 2px solid #fce7f3;
+            background: linear-gradient(135deg, #fce7f3 0%, #f8fafc 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .system-title {
+            color: #0f172a;
+            font-size: 32px;
+            font-weight: 800;
+            margin: 24px 0 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .system-subtitle {
+            color: #64748b;
+            font-size: 16px;
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #0f172a;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid #f1f5f9;
+            border-radius: 16px;
+            font-size: 16px;
+            background: #fefefe;
+            transition: all 0.3s ease;
+            color: #0f172a;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #f9a8d4;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(249, 168, 212, 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(236, 72, 153, 0.25);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #fef2f2 0%, #fce7e7 100%);
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+            border: 1px solid #fecaca;
+            font-size: 14px;
+        }
+
+        .loading {
+            display: none;
+            margin: 16px 0;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #f1f5f9;
+            border-top: 2px solid #ec4899;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 관리자 대시보드 스타일 */
+        .dashboard {
+            display: none;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #fefefe 0%, #f8fafc 100%);
+        }
+
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 24px 32px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid rgba(248, 113, 113, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dashboard-logo {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .dashboard-logo img {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 2px solid #fce7f3;
+        }
+
+        .dashboard-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .logout-btn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .dashboard-content {
+            padding: 40px 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .settings-section {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(249, 168, 212, 0.1);
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-upload-area {
+            border: 2px dashed #f9a8d4;
+            border-radius: 20px;
+            padding: 48px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: linear-gradient(135deg, #fefcfe 0%, #fef7f7 100%);
+        }
+
+        .logo-upload-area:hover {
+            border-color: #ec4899;
+            background: linear-gradient(135deg, #fdf2f8 0%, #fef2f2 100%);
+            transform: translateY(-2px);
+        }
+
+        .logo-upload-area.dragover {
+            border-color: #ec4899;
+            background: linear-gradient(135deg, #fdf2f8 0%, #fef2f2 100%);
+            box-shadow: 0 8px 25px rgba(236, 72, 153, 0.1);
+        }
+
+        .current-logo {
+            width: 120px;
+            height: 120px;
+            border-radius: 16px;
+            object-fit: cover;
+            margin-bottom: 16px;
+            border: 3px solid #fce7f3;
+        }
+
+        .upload-text {
+            color: #0f172a;
+            font-size: 18px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(236, 72, 153, 0.25);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #f1f5f9;
+            border-radius: 2px;
+            margin: 16px 0;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status-message {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 로그인 화면 -->
+    <div id="loginScreen" class="login-container">
+        <div class="logo-container">
+            <div id="loginLogo" class="company-logo">
+                회사 로고
+            </div>
+        </div>
+        
+        <h1 class="system-title">ERP 시스템</h1>
+        <p class="system-subtitle">관리자 로그인</p>
+        
+        <div id="errorMessage" class="error-message"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">이메일</label>
+                <input type="email" id="email" required placeholder="admin@company.com" value="admin@company.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" required placeholder="비밀번호를 입력하세요" value="admin123">
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                로그인 중...
+            </div>
+            
+            <button type="submit" class="login-btn" id="loginBtn">
+                관리자로 로그인
+            </button>
+        </form>
+        
+        <!-- 테스트 계정 정보 -->
+        <div style="margin-top: 20px; padding: 16px; background: rgba(249, 168, 212, 0.1); border-radius: 12px; border: 1px solid rgba(249, 168, 212, 0.2);">
+            <h4 style="color: #0f172a; margin-bottom: 8px; font-size: 14px;">🧪 테스트 계정</h4>
+            <p style="color: #64748b; font-size: 12px; margin-bottom: 4px;">이메일: admin@company.com</p>
+            <p style="color: #64748b; font-size: 12px; margin-bottom: 8px;">비밀번호: admin123</p>
+            <p style="color: #991b1b; font-size: 11px; font-weight: 500;">⚠️ 실제 사용 전에 Supabase Auth에서 계정을 생성해야 합니다.</p>
+        </div>
+    </div>
+
+    <!-- 관리자 대시보드 -->
+    <div id="dashboard" class="dashboard">
+        <header class="dashboard-header">
+            <div class="dashboard-logo">
+                <img id="dashboardLogo" src="" alt="회사 로고" style="display: none;">
+                <div id="dashboardLogoPlaceholder" class="company-logo" style="width: 48px; height: 48px; font-size: 11px;">로고</div>
+                <div class="dashboard-title">ERP 관리 시스템</div>
+            </div>
+            <div class="user-info">
+                <span id="userEmail"></span>
+                <button class="logout-btn" onclick="signOut()">로그아웃</button>
+            </div>
+        </header>
+
+        <div class="dashboard-content">
+            <section class="settings-section">
+                <h2 class="section-title">
+                    🏢 회사 설정
+                </h2>
+                
+                <div class="logo-upload-area" id="logoUploadArea" onclick="document.getElementById('logoFileInput').click()">
+                    <img id="currentLogo" class="current-logo" style="display: none;" alt="현재 로고">
+                    <div id="logoPlaceholder">
+                        <div class="upload-text">회사 로고를 업로드하세요</div>
+                        <div style="color: #64748b; font-size: 14px; margin-bottom: 20px;">
+                            PNG, JPG 파일 (최대 5MB)
+                        </div>
+                        <button type="button" class="upload-btn">파일 선택</button>
+                    </div>
+                </div>
+                
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                
+                <div class="status-message" id="statusMessage"></div>
+                
+                <input type="file" id="logoFileInput" class="file-input" accept="image/*" onchange="handleLogoUpload(event)">
+            </section>
+
+            <section class="settings-section">
+                <h2 class="section-title">
+                    ⚙️ 시스템 설정
+                </h2>
+                <p style="color: #64748b; font-size: 16px;">기타 시스템 설정들이 여기에 표시됩니다.</p>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Supabase 설정 (실제 값으로 업데이트됨)
+        const supabaseUrl = 'https://utesnkxljuxcgitlcizr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0ZXNua3hsanV4Y2dpdGxjaXpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5ODA0NzYsImV4cCI6MjA2OTU1NjQ3Nn0.5ih16HB_y8Yo1i1O4cxo1x0I_-Q3VsRB5m5EB6uXd3g';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // 페이지 로드 시 인증 상태 확인
+        window.addEventListener('load', async () => {
+            await checkAuthStatus();
+            await loadCompanyLogo();
+        });
+
+        // 인증 상태 확인
+        async function checkAuthStatus() {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+                showDashboard(user);
+            } else {
+                showLogin();
+            }
+        }
+
+        // 로그인 화면 표시
+        function showLogin() {
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+        }
+
+        // 대시보드 표시
+        function showDashboard(user) {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('userEmail').textContent = user.email;
+        }
+
+        // 로그인 폼 처리
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+            const loading = document.getElementById('loading');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // UI 상태 변경
+            loading.style.display = 'block';
+            loginBtn.disabled = true;
+            errorDiv.style.display = 'none';
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) throw error;
+                
+                // 로그인 성공
+                showDashboard(data.user);
+                await loadCompanyLogo();
+                
+            } catch (error) {
+                // 에러 표시
+                errorDiv.textContent = '로그인 실패: ' + error.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                // UI 복원
+                loading.style.display = 'none';
+                loginBtn.disabled = false;
+            }
+        });
+
+        // 로그아웃
+        async function signOut() {
+            const { error } = await supabase.auth.signOut();
+            if (!error) {
+                showLogin();
+            }
+        }
+
+        // 로고 업로드 처리 (개선된 버전)
+        async function handleLogoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // 파일 크기 체크 (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('❌ 파일 크기는 5MB 이하여야 합니다.');
+                return;
+            }
+
+            // 파일 타입 체크
+            if (!file.type.startsWith('image/')) {
+                alert('❌ 이미지 파일만 업로드 가능합니다.');
+                return;
+            }
+
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const statusMessage = document.getElementById('statusMessage');
+
+            try {
+                // UI 상태 업데이트
+                progressBar.style.display = 'block';
+                statusMessage.style.display = 'block';
+                statusMessage.textContent = '🔍 Storage 버킷 확인 중...';
+                progressFill.style.width = '20%';
+
+                // 1. Storage 버킷 확인 및 생성
+                const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+                
+                if (bucketError) {
+                    throw new Error(`Storage 연결 실패: ${bucketError.message}`);
+                }
+
+                statusMessage.textContent = '📦 버킷 확인 완료';
+                progressFill.style.width = '40%';
+
+                // 2. company-logos 버킷 확인
+                const companyLogosBucket = buckets.find(bucket => bucket.name === 'company-logos');
+                
+                if (!companyLogosBucket) {
+                    statusMessage.textContent = '🔨 company-logos 버킷 생성 중...';
+                    progressFill.style.width = '50%';
+                    
+                    const { data, error } = await supabase.storage.createBucket('company-logos', {
+                        public: true,
+                        fileSizeLimit: 5242880, // 5MB
+                        allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+                    });
+                    
+                    if (error) {
+                        throw new Error(`버킷 생성 실패: ${error.message}`);
+                    }
+                    
+                    statusMessage.textContent = '✅ 버킷 생성 완료';
+                }
+
+                progressFill.style.width = '60%';
+                statusMessage.textContent = '📤 파일 업로드 중...';
+
+                // 3. 기존 로고 삭제 (있다면)
+                try {
+                    await supabase.storage
+                        .from('company-logos')
+                        .remove(['company-logo.png', 'company-logo.jpg', 'company-logo.jpeg']);
+                } catch (error) {
+                    // 기존 파일이 없어도 무시
+                }
+
+                // 4. 새 로고 업로드
+                const fileName = `company-logo.${file.name.split('.').pop()}`;
+                const { data, error } = await supabase.storage
+                    .from('company-logos')
+                    .upload(fileName, file, {
+                        cacheControl: '3600',
+                        upsert: true
+                    });
+
+                if (error) throw error;
+
+                progressFill.style.width = '80%';
+                statusMessage.textContent = '🔄 로고 업데이트 중...';
+
+                // 5. 업로드된 로고 표시
+                await loadCompanyLogo();
+                
+                progressFill.style.width = '100%';
+                statusMessage.textContent = '✅ 로고 업로드 완료!';
+                
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    statusMessage.style.display = 'none';
+                }, 2000);
+
+                alert('✅ 로고가 성공적으로 업로드되었습니다!');
+
+            } catch (error) {
+                console.error('로고 업로드 에러:', error);
+                progressBar.style.display = 'none';
+                statusMessage.style.display = 'none';
+                alert('❌ 로고 업로드 실패: ' + error.message);
+            }
+        }
+
+        // 회사 로고 불러오기 (개선된 버전)
+        async function loadCompanyLogo() {
+            try {
+                // company-logos 버킷에서 파일 목록 가져오기
+                const { data: files, error } = await supabase.storage
+                    .from('company-logos')
+                    .list('', {
+                        limit: 10,
+                        offset: 0
+                    });
+
+                if (error) {
+                    console.error('로고 목록 조회 실패:', error);
+                    return;
+                }
+
+                // company-logo로 시작하는 파일 찾기
+                const logoFile = files.find(file => file.name.startsWith('company-logo'));
+
+                if (logoFile) {
+                    // 로고 URL 생성
+                    const { data } = supabase.storage
+                        .from('company-logos')
+                        .getPublicUrl(logoFile.name);
+
+                    const logoUrl = data.publicUrl;
+
+                    // 모든 로고 이미지 업데이트
+                    updateLogoDisplay(logoUrl);
+                }
+
+            } catch (error) {
+                console.error('로고 로드 에러:', error);
+            }
+        }
+
+        // 로고 표시 업데이트
+        function updateLogoDisplay(logoUrl) {
+            // 로그인 화면 로고
+            const loginLogo = document.getElementById('loginLogo');
+            loginLogo.innerHTML = `<img src="${logoUrl}" alt="회사 로고" style="width: 100%; height: 100%; object-fit: cover; border-radius: 20px;">`;
+
+            // 대시보드 헤더 로고
+            const dashboardLogo = document.getElementById('dashboardLogo');
+            const dashboardLogoPlaceholder = document.getElementById('dashboardLogoPlaceholder');
+            
+            dashboardLogo.src = logoUrl;
+            dashboardLogo.style.display = 'block';
+            dashboardLogoPlaceholder.style.display = 'none';
+
+            // 설정 화면 현재 로고
+            const currentLogo = document.getElementById('currentLogo');
+            const logoPlaceholder = document.getElementById('logoPlaceholder');
+            
+            currentLogo.src = logoUrl;
+            currentLogo.style.display = 'block';
+            logoPlaceholder.style.display = 'none';
+        }
+
+        // 드래그 앤 드롭 기능
+        const uploadArea = document.getElementById('logoUploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('logoFileInput').files = files;
+                handleLogoUpload({ target: { files: files } });
+            }
+        });
+    </script>
+</body>
+</html> 

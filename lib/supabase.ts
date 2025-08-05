@@ -4,22 +4,81 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 // 디버깅용 로그
-console.log('Supabase URL:', supabaseUrl)
-console.log('Supabase Key exists:', !!supabaseAnonKey)
-console.log('URL starts with https:', supabaseUrl?.startsWith('https://'))
+console.log('🔧 Supabase 설정 확인:')
+console.log('URL:', supabaseUrl ? '설정됨' : '❌ 설정되지 않음')
+console.log('Key:', supabaseAnonKey ? '설정됨' : '❌ 설정되지 않음')
 
 let supabase = null
 
 try {
-  if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_project_url_here' && supabaseUrl.startsWith('https://')) {
-    supabase = createClient(supabaseUrl, supabaseAnonKey)
-    console.log('Supabase client created successfully')
+  if (supabaseUrl && supabaseAnonKey && 
+      supabaseUrl !== 'your_supabase_project_url_here' && 
+      supabaseUrl.startsWith('https://')) {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    })
+    console.log('✅ Supabase 클라이언트 생성 성공')
   } else {
-    console.log('Supabase client not created - missing or invalid credentials')
+    console.error('❌ Supabase 클라이언트 생성 실패 - 잘못된 설정')
+    console.error('URL:', supabaseUrl)
+    console.error('Key exists:', !!supabaseAnonKey)
   }
 } catch (error) {
-  console.error('Error creating Supabase client:', error)
+  console.error('❌ Supabase 클라이언트 생성 중 오류:', error)
   supabase = null
+}
+
+// Storage 버킷 확인 함수
+export const checkStorageBuckets = async () => {
+  if (!supabase) {
+    console.error('❌ Supabase 클라이언트가 초기화되지 않음')
+    return { success: false, buckets: [], error: 'Supabase 클라이언트 초기화 실패' }
+  }
+
+  try {
+    const { data: buckets, error } = await supabase.storage.listBuckets()
+    
+    if (error) {
+      console.error('❌ Storage 버킷 목록 조회 실패:', error)
+      return { success: false, buckets: [], error: error.message }
+    }
+
+    console.log('📦 사용 가능한 Storage 버킷:', buckets?.map(b => b.name))
+    return { success: true, buckets: buckets || [], error: null }
+  } catch (error) {
+    console.error('❌ Storage 버킷 확인 중 예외 발생:', error)
+    return { success: false, buckets: [], error: error instanceof Error ? error.message : '알 수 없는 오류' }
+  }
+}
+
+// Storage 버킷 생성 함수
+export const createStorageBucket = async (bucketName: string) => {
+  if (!supabase) {
+    return { success: false, error: 'Supabase 클라이언트 초기화 실패' }
+  }
+
+  try {
+    const { data, error } = await supabase.storage.createBucket(bucketName, {
+      public: true,
+      fileSizeLimit: 5242880, // 5MB
+      allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    })
+
+    if (error) {
+      console.error(`❌ ${bucketName} 버킷 생성 실패:`, error)
+      return { success: false, error: error.message }
+    }
+
+    console.log(`✅ ${bucketName} 버킷 생성 성공:`, data)
+    return { success: true, data, error: null }
+  } catch (error) {
+    console.error(`❌ ${bucketName} 버킷 생성 중 예외 발생:`, error)
+    return { success: false, error: error instanceof Error ? error.message : '알 수 없는 오류' }
+  }
 }
 
 export { supabase }
