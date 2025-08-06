@@ -2102,103 +2102,166 @@ const PayrollDashboard = () => {
     return safeName;
   };
 
+  // Supabase 연결 테스트 함수
+  const testSupabaseConnection = async () => {
+    try {
+      console.log('=== Supabase 연결 테스트 ===');
+      
+      // 1. 환경변수 확인
+      console.log('환경변수 확인:', {
+        SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        ANON_KEY_EXISTS: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        SUPABASE_CLIENT: !!supabase
+      });
+      
+      if (!supabase) {
+        console.error('❌ Supabase 클라이언트가 초기화되지 않았습니다.');
+        return false;
+      }
+      
+      // 2. 데이터베이스 연결 테스트
+      const { data, error } = await supabase
+        .from('employees')
+        .select('count')
+        .limit(1);
+      
+      if (error) {
+        console.error('❌ DB 연결 오류:', error);
+        return false;
+      } else {
+        console.log('✅ DB 연결 성공');
+      }
+      
+      // 3. Storage 연결 테스트
+      const { data: buckets, error: storageError } = await supabase.storage.listBuckets();
+      
+      if (storageError) {
+        console.error('❌ Storage 연결 오류:', storageError);
+        return false;
+      } else {
+        console.log('✅ Storage 연결 성공');
+        console.log('사용 가능한 버킷:', buckets?.map(b => b.name));
+        return true;
+      }
+      
+    } catch (error) {
+      console.error('❌ 연결 테스트 실패:', error);
+      return false;
+    }
+  };
+
   // 직원 사진 업로드 함수 (개선된 버전)
   const handleEmployeePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>, employeeId?: number) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // 업로드 상태 초기화
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-      // 1. 파일 검증
-      console.log('파일 검증 시작:', {
+      console.log('=== 사진 업로드 시작 ===');
+      console.log('파일 정보:', {
         name: file.name,
         size: file.size,
         type: file.type
       });
 
-      // 파일 크기 검증 (5MB 이하)
+      // 1. Supabase 연결 테스트
+      const connectionOk = await testSupabaseConnection();
+      if (!connectionOk) {
+        throw new Error('Supabase 연결에 실패했습니다. 환경변수를 확인해주세요.');
+      }
+
+      setUploadProgress(10);
+
+      // 2. 파일 검증
       if (file.size > 5 * 1024 * 1024) {
         throw new Error('파일 크기는 5MB 이하여야 합니다.');
       }
 
-      // 파일 타입 검증 (더 엄격한 검증)
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
         throw new Error('지원되는 이미지 형식: JPEG, PNG, GIF, WebP');
       }
 
-      // 파일명 검증
-      const fileName = file.name.toLowerCase();
-      if (fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
-        throw new Error('잘못된 파일명입니다.');
+      setUploadProgress(20);
+
+      // 3. 버킷 확인 및 생성
+      console.log('버킷 확인 중...');
+      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+      
+      if (bucketError) {
+        console.error('버킷 조회 오류:', bucketError);
+        throw new Error(`Storage 버킷 조회 실패: ${bucketError.message}`);
       }
 
-      setUploadProgress(20);
-      console.log('파일 검증 완료');
+      const targetBucket = 'employee-photos';
+      const bucketExists = buckets?.some(bucket => bucket.name === targetBucket);
 
-      // 2. Storage 버킷 확인 (건너뛰기)
-      console.log('Storage 버킷 확인 건너뛰기 - 직접 업로드 시도');
-
-      // 3. 안전한 파일명 생성
-      const safeFileName = createSafeFileName(file.name, employeeId);
-      const filePath = safeFileName;
-
-      console.log('업로드 시작:', filePath);
-      setUploadProgress(40);
-
-      // 4. Supabase Storage에 업로드
-              console.log('Storage 업로드 시도:', {
-          bucket: 'employee-photos',
-          filePath: filePath,
-          fileSize: file.size,
-          fileType: file.type
+      if (!bucketExists) {
+        console.log(`${targetBucket} 버킷 생성 시도...`);
+        const { error: createError } = await supabase.storage.createBucket(targetBucket, {
+          public: true,
+          fileSizeLimit: 5242880,
+          allowedMimeTypes: allowedTypes
         });
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('employee-photos')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false // 기존 파일 덮어쓰기 방지
-          });
+        if (createError) {
+          console.error('버킷 생성 오류:', createError);
+          throw new Error(`Storage 버킷 생성 실패: ${createError.message}\n\nSupabase 대시보드에서 수동으로 생성해주세요:\n1. Storage → New bucket\n2. Name: employee-photos\n3. Public bucket ✓`);
+        }
+        console.log('✅ 버킷 생성 성공');
+      }
+
+      setUploadProgress(40);
+
+      // 4. 안전한 파일명 생성
+      const timestamp = Date.now();
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const safeFileName = `emp_${employeeId || 'new'}_${timestamp}.${fileExtension}`;
+
+      console.log('업로드 시작:', safeFileName);
+
+      // 5. 파일 업로드
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from(targetBucket)
+        .upload(safeFileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) {
-        console.error('Storage 업로드 오류:', uploadError);
+        console.error('업로드 오류:', uploadError);
         
-        // 구체적인 오류 메시지 처리
         if (uploadError.message.includes('already exists')) {
-          throw new Error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해주세요.');
+          throw new Error('동일한 파일명이 이미 존재합니다. 다시 시도해주세요.');
         } else if (uploadError.message.includes('not found') || uploadError.message.includes('Bucket not found')) {
-          throw new Error('Storage 버킷(employee-photos)을 찾을 수 없습니다. Supabase 대시보드에서 Storage → New bucket → Name: employee-photos, Public bucket 체크 후 생성해주세요.');
+          throw new Error('Storage 버킷을 찾을 수 없습니다.\n\nSupabase 대시보드에서 버킷을 생성해주세요:\n1. Storage → New bucket\n2. Name: employee-photos\n3. Public bucket ✓');
         } else if (uploadError.message.includes('permission') || uploadError.message.includes('Forbidden')) {
-          throw new Error('파일 업로드 권한이 없습니다. Storage 권한을 확인해주세요.');
-        } else if (uploadError.message.includes('Unauthorized')) {
-          throw new Error('인증 오류가 발생했습니다. 다시 로그인해주세요.');
+          throw new Error('업로드 권한이 없습니다. Storage 정책을 확인해주세요.');
         } else {
-          throw new Error(`업로드 오류: ${uploadError.message}`);
+          throw new Error(`업로드 실패: ${uploadError.message}`);
         }
       }
 
+      console.log('✅ 업로드 성공:', uploadData);
       setUploadProgress(70);
-      console.log('Storage 업로드 성공');
 
-              // 5. 공개 URL 가져오기
-        const { data: urlData } = supabase.storage
-          .from('employee-photos')
-          .getPublicUrl(filePath);
+      // 6. 공개 URL 생성
+      const { data: urlData } = supabase.storage
+        .from(targetBucket)
+        .getPublicUrl(safeFileName);
 
       const photoUrl = urlData.publicUrl;
 
       if (!photoUrl) {
-        throw new Error('파일 URL을 생성할 수 없습니다.');
+        throw new Error('공개 URL 생성에 실패했습니다.');
       }
 
-      setUploadProgress(85);
-      console.log('공개 URL 생성 완료:', photoUrl);
+      console.log('✅ 공개 URL 생성:', photoUrl);
+      setUploadProgress(90);
 
-      // 6. 데이터베이스 업데이트
+      // 7. 데이터베이스 업데이트
       if (employeeId) {
         console.log('기존 직원 사진 업데이트:', employeeId);
         
