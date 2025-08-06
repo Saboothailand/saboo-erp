@@ -1322,7 +1322,7 @@ const PayrollDashboard = () => {
       console.log('📦 현재 사용 가능한 버킷:', buckets?.map(b => b.name));
       
       // 3. 필요한 버킷 확인
-      const requiredBuckets = ['company-logo', 'dashboard-logo', 'employee-photo'];
+      const requiredBuckets = ['company-logos', 'dashboard-logos', 'employee-photos'];
       const missingBuckets = requiredBuckets.filter(name => 
         !buckets?.some(bucket => bucket.name === name)
       );
@@ -1353,7 +1353,7 @@ const PayrollDashboard = () => {
         }
 
         if (createdCount === 0) {
-          alert(`❌ Storage 버킷이 없습니다.\n\n누락된 버킷: ${missingBuckets.join(', ')}\n\nSupabase 대시보드에서 수동으로 생성해주세요:\n1. Storage → New bucket\n2. Name: company-logo\n3. Public bucket 체크\n4. 생성`);
+          alert(`❌ Storage 버킷이 없습니다.\n\n누락된 버킷: ${missingBuckets.join(', ')}\n\nSupabase 대시보드에서 수동으로 생성해주세요:\n1. Storage → New bucket\n2. Name: company-logos\n3. Public bucket 체크\n4. 생성`);
           return;
         } else {
           console.log(`✅ ${createdCount}개 버킷 생성 완료`);
@@ -1362,7 +1362,7 @@ const PayrollDashboard = () => {
 
       // 4. 파일 업로드
       const fileName = `logo_${Date.now()}_${file.name}`;
-      const bucketName = 'company-logo';
+      const bucketName = 'company-logos';
       
       console.log(`📤 ${bucketName} 버킷으로 업로드 시도...`);
       
@@ -1508,23 +1508,23 @@ const PayrollDashboard = () => {
 
       setUploadProgress(40);
 
-          // 4. company-logo 버킷 확인
-    const companyLogosBucket = buckets?.find(bucket => bucket.name === 'company-logo');
+          // 4. company-logos 버킷 확인
+    const companyLogosBucket = buckets?.find(bucket => bucket.name === 'company-logos');
     
     if (!companyLogosBucket) {
-      console.log('🔨 company-logo 버킷 생성 시도...');
-      const { data, error } = await supabase.storage.createBucket('company-logo', {
+      console.log('🔨 company-logos 버킷 생성 시도...');
+      const { data, error } = await supabase.storage.createBucket('company-logos', {
           public: true,
           fileSizeLimit: 5242880, // 5MB
           allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
         });
         
         if (error) {
-          console.error('❌ company-logo 버킷 생성 실패:', error);
+          console.error('❌ company-logos 버킷 생성 실패:', error);
           alert(`❌ Storage 버킷 생성 실패: ${error.message}\n\nSupabase 대시보드에서 수동으로 생성해주세요.`);
           return;
         }
-        console.log('✅ company-logo 버킷 생성 성공');
+        console.log('✅ company-logos 버킷 생성 성공');
       }
 
       setUploadProgress(60);
@@ -1537,7 +1537,7 @@ const PayrollDashboard = () => {
       console.log('📤 파일 업로드 시도...');
       
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('company-logo')
+        .from('company-logos')
         .upload(safeFileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -1553,7 +1553,7 @@ const PayrollDashboard = () => {
 
       // 6. 공개 URL 생성
       const { data: urlData } = supabase.storage
-        .from('company-logo')
+        .from('company-logos')
         .getPublicUrl(safeFileName);
 
       if (!urlData?.publicUrl) {
@@ -2026,7 +2026,7 @@ const PayrollDashboard = () => {
   const checkStorageBucket = async () => {
     try {
       // 직접 버킷 정보 조회 시도
-      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('employee-photo');
+      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('employee-photos');
       if (bucketError) {
         console.error('버킷 조회 오류:', bucketError);
         // 버킷 목록으로 재확인
@@ -2035,7 +2035,7 @@ const PayrollDashboard = () => {
           console.error('버킷 목록 조회 오류:', listError);
           return false;
         }
-        const bucketExists = buckets?.some(bucket => bucket.name === 'employee-photo');
+        const bucketExists = buckets?.some(bucket => bucket.name === 'employee-photos');
         console.log('Storage 버킷 확인 (목록):', {
           totalBuckets: buckets?.length,
           employeePhotosExists: bucketExists,
@@ -2055,8 +2055,8 @@ const PayrollDashboard = () => {
   const ensureStorageBucket = async () => {
     const bucketExists = await checkStorageBucket();
           if (!bucketExists) {
-        console.error('employee-photo 버킷이 존재하지 않습니다.');
-        throw new Error('Storage 버킷(employee-photo)이 존재하지 않습니다. Supabase 대시보드에서 Storage → New bucket → Name: employee-photo, Public bucket 체크 후 생성해주세요.');
+        console.error('employee-photos 버킷이 존재하지 않습니다.');
+        throw new Error('Storage 버킷(employee-photos)이 존재하지 않습니다. Supabase 대시보드에서 Storage → New bucket → Name: employee-photos, Public bucket 체크 후 생성해주세요.');
       }
     return true;
   };
@@ -2073,15 +2073,15 @@ const PayrollDashboard = () => {
       
       console.log('현재 사용 가능한 버킷:', buckets.map(b => b.name));
       
-      const companyLogosBucket = buckets.find(bucket => bucket.name === 'company-logo');
+      const companyLogosBucket = buckets.find(bucket => bucket.name === 'company-logos');
       
       if (!companyLogosBucket) {
         const bucketNames = buckets.map(b => b.name).join(', ') || '없음';
-        alert(`company-logo 버킷이 존재하지 않습니다.\n\n현재 사용 가능한 버킷:\n${bucketNames}\n\nSupabase 대시보드에서 Storage → New bucket → Name: company-logo, Public bucket 체크 후 생성해주세요.`);
+        alert(`company-logos 버킷이 존재하지 않습니다.\n\n현재 사용 가능한 버킷:\n${bucketNames}\n\nSupabase 대시보드에서 Storage → New bucket → Name: company-logos, Public bucket 체크 후 생성해주세요.`);
         return false;
       }
       
-      console.log('company-logo 버킷 확인됨');
+      console.log('company-logos 버킷 확인됨');
       return true;
     } catch (error) {
       console.error('Error checking logo storage bucket:', error);
@@ -2151,14 +2151,14 @@ const PayrollDashboard = () => {
 
       // 4. Supabase Storage에 업로드
               console.log('Storage 업로드 시도:', {
-          bucket: 'employee-photo',
+          bucket: 'employee-photos',
           filePath: filePath,
           fileSize: file.size,
           fileType: file.type
         });
 
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('employee-photo')
+          .from('employee-photos')
           .upload(filePath, file, {
             cacheControl: '3600',
             upsert: false // 기존 파일 덮어쓰기 방지
@@ -2171,7 +2171,7 @@ const PayrollDashboard = () => {
         if (uploadError.message.includes('already exists')) {
           throw new Error('동일한 파일명이 이미 존재합니다. 다른 파일을 선택해주세요.');
         } else if (uploadError.message.includes('not found') || uploadError.message.includes('Bucket not found')) {
-          throw new Error('Storage 버킷(employee-photo)을 찾을 수 없습니다. Supabase 대시보드에서 Storage → New bucket → Name: employee-photo, Public bucket 체크 후 생성해주세요.');
+          throw new Error('Storage 버킷(employee-photos)을 찾을 수 없습니다. Supabase 대시보드에서 Storage → New bucket → Name: employee-photos, Public bucket 체크 후 생성해주세요.');
         } else if (uploadError.message.includes('permission') || uploadError.message.includes('Forbidden')) {
           throw new Error('파일 업로드 권한이 없습니다. Storage 권한을 확인해주세요.');
         } else if (uploadError.message.includes('Unauthorized')) {
@@ -2186,7 +2186,7 @@ const PayrollDashboard = () => {
 
               // 5. 공개 URL 가져오기
         const { data: urlData } = supabase.storage
-          .from('employee-photo')
+          .from('employee-photos')
           .getPublicUrl(filePath);
 
       const photoUrl = urlData.publicUrl;
