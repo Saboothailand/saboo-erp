@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage 연결 테스트</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Supabase Storage 연결 테스트</h1>
+        
+        <div id="status" class="status info">초기화 중...</div>
+        
+        <h2>1. 연결 테스트</h2>
+        <button onclick="testConnection()">연결 테스트</button>
+        <button onclick="listBuckets()">버킷 목록 확인</button>
+        
+        <h2>2. 파일 업로드 테스트</h2>
+        <input type="file" id="testFile" accept="image/*">
+        <button onclick="uploadFile()">업로드 테스트</button>
+        <button onclick="listFiles()">파일 목록 확인</button>
+        
+        <h2>3. 로그</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        // Supabase 설정
+        const supabaseUrl = 'https://utesnkxljuxcgitlcizr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0ZXNua3hsanV4Y2dpdGxjaXpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM5ODA0NzYsImV4cCI6MjA2OTU1NjQ3Nn0.5ih16HB_y8Yo1i1O4cxo1x0I_-Q3VsRB5m5EB6uXd3g';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        async function testConnection() {
+            try {
+                log('🔧 Supabase 연결 테스트 시작...');
+                updateStatus('연결 테스트 중...', 'info');
+                
+                const { data, error } = await supabase.from('employees').select('count').limit(1);
+                
+                if (error) {
+                    log(`❌ 연결 실패: ${error.message}`, 'error');
+                    updateStatus('연결 실패', 'error');
+                } else {
+                    log('✅ Supabase 연결 성공!', 'success');
+                    updateStatus('연결 성공', 'success');
+                }
+            } catch (error) {
+                log(`❌ 예외 발생: ${error.message}`, 'error');
+                updateStatus('연결 실패', 'error');
+            }
+        }
+        
+        async function listBuckets() {
+            try {
+                log('📦 Storage 버킷 목록 조회 중...');
+                
+                const { data: buckets, error } = await supabase.storage.listBuckets();
+                
+                if (error) {
+                    log(`❌ 버킷 목록 조회 실패: ${error.message}`, 'error');
+                } else {
+                    log(`✅ 버킷 목록 조회 성공: ${buckets.length}개 버킷`);
+                    buckets.forEach(bucket => {
+                        log(`  - ${bucket.name} (public: ${bucket.public})`);
+                    });
+                }
+            } catch (error) {
+                log(`❌ 예외 발생: ${error.message}`, 'error');
+            }
+        }
+        
+        async function uploadFile() {
+            const fileInput = document.getElementById('testFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('❌ 파일을 선택해주세요', 'error');
+                return;
+            }
+            
+            try {
+                log(`📤 파일 업로드 시작: ${file.name} (${file.size} bytes)`);
+                
+                const fileName = `test-${Date.now()}-${file.name}`;
+                const { data, error } = await supabase.storage
+                    .from('company-logos')
+                    .upload(fileName, file);
+                
+                if (error) {
+                    log(`❌ 업로드 실패: ${error.message}`, 'error');
+                } else {
+                    log(`✅ 업로드 성공: ${fileName}`, 'success');
+                    
+                    // 공개 URL 생성
+                    const { data: urlData } = supabase.storage
+                        .from('company-logos')
+                        .getPublicUrl(fileName);
+                    
+                    log(`🔗 공개 URL: ${urlData.publicUrl}`, 'success');
+                }
+            } catch (error) {
+                log(`❌ 예외 발생: ${error.message}`, 'error');
+            }
+        }
+        
+        async function listFiles() {
+            try {
+                log('📁 파일 목록 조회 중...');
+                
+                const { data: files, error } = await supabase.storage
+                    .from('company-logos')
+                    .list();
+                
+                if (error) {
+                    log(`❌ 파일 목록 조회 실패: ${error.message}`, 'error');
+                } else {
+                    log(`✅ 파일 목록 조회 성공: ${files.length}개 파일`);
+                    files.forEach(file => {
+                        log(`  - ${file.name} (${file.metadata?.size || 'unknown'} bytes)`);
+                    });
+                }
+            } catch (error) {
+                log(`❌ 예외 발생: ${error.message}`, 'error');
+            }
+        }
+        
+        // 페이지 로드 시 자동 연결 테스트
+        window.onload = function() {
+            log('🚀 Storage 테스트 페이지 로드됨');
+            testConnection();
+        };
+    </script>
+</body>
+</html> 

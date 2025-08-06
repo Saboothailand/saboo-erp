@@ -139,7 +139,7 @@ const PayrollDashboard = () => {
     dateFormat: 'YYYY-MM-DD',
     currency: 'KRW',
     timezone: 'Asia/Seoul',
-    logoUrl: '',
+    logo_url: '',
     logoText: '급여관리',
     showLogo: true
   });
@@ -439,7 +439,7 @@ const PayrollDashboard = () => {
           dateFormat: dashboardSettingsData.date_format || 'YYYY-MM-DD',
           currency: dashboardSettingsData.currency || 'KRW',
           timezone: dashboardSettingsData.timezone || 'Asia/Seoul',
-          logoUrl: dashboardSettingsData.logo_url || '',
+          logo_url: dashboardSettingsData.logo_url || '',
           logoText: dashboardSettingsData.logo_text || '급여관리',
           showLogo: dashboardSettingsData.show_logo !== false
         });
@@ -1508,12 +1508,12 @@ const PayrollDashboard = () => {
 
       setUploadProgress(40);
 
-      // 4. company-logos 버킷 확인
-      const companyLogosBucket = buckets?.find(bucket => bucket.name === 'company-logos');
-      
-      if (!companyLogosBucket) {
-        console.log('🔨 company-logos 버킷 생성 시도...');
-        const { data, error } = await supabase.storage.createBucket('company-logos', {
+          // 4. company-logos 버킷 확인
+    const companyLogosBucket = buckets?.find(bucket => bucket.name === 'company-logos');
+    
+    if (!companyLogosBucket) {
+      console.log('🔨 company-logos 버킷 생성 시도...');
+      const { data, error } = await supabase.storage.createBucket('company-logos', {
           public: true,
           fileSizeLimit: 5242880, // 5MB
           allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
@@ -1601,7 +1601,7 @@ const PayrollDashboard = () => {
           date_format: dashboardSettings.dateFormat,
           currency: dashboardSettings.currency,
           timezone: dashboardSettings.timezone,
-          logo_url: dashboardSettings.logoUrl,
+          logo_url: dashboardSettings.logo_url,
           logo_text: dashboardSettings.logoText,
           show_logo: dashboardSettings.showLogo
         });
@@ -2564,17 +2564,17 @@ const PayrollDashboard = () => {
       <div className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            {dashboardSettings.showLogo && dashboardSettings.logoUrl ? (
-              <img 
-                src={dashboardSettings.logoUrl} 
+                    {dashboardSettings.showLogo && dashboardSettings.logo_url ? (
+          <img 
+            src={dashboardSettings.logo_url} 
                 alt="Dashboard Logo" 
                 className={`w-8 h-8 rounded object-cover ${!sidebarOpen && 'hidden'}`}
                 onError={(e) => {
-                  console.error('로고 이미지 로드 실패:', dashboardSettings.logoUrl);
+                  console.error('로고 이미지 로드 실패:', dashboardSettings.logo_url);
                   e.currentTarget.style.display = 'none';
                 }}
                 onLoad={() => {
-                  console.log('로고 이미지 로드 성공:', dashboardSettings.logoUrl);
+                  console.log('로고 이미지 로드 성공:', dashboardSettings.logo_url);
                 }}
               />
             ) : (
@@ -3545,10 +3545,10 @@ const PayrollDashboard = () => {
         <div className="bg-white rounded-lg shadow-sm border border-pink-200 p-6">
           <h3 className="text-lg font-semibold mb-4 text-black">로고</h3>
           <div className="space-y-4">
-            {dashboardSettings.logoUrl ? (
+            {dashboardSettings?.logo_url ? (
               <div>
                 <img 
-                  src={dashboardSettings.logoUrl} 
+                  src={dashboardSettings.logo_url} 
                   alt="Dashboard Logo" 
                   className="w-32 h-32 object-contain border border-pink-200 rounded-lg"
                 />
